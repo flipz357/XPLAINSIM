@@ -1,0 +1,2 @@
+from xplain.spaceshaping.model import PartitionedSentenceTransformer
+
