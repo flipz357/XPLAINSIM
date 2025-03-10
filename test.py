@@ -23,7 +23,6 @@ def test_space_shaping():
     print(pearsonr([x.label[0] for x in some_examples],[dic["bow"] for dic in json]))
 
 def test_attribution():
-    import torch
     from sentence_transformers.models import Pooling
     from xplain.attribution import utils, ReferenceTransformer, XSMPNet
     transformer = ReferenceTransformer('sentence-transformers/all-mpnet-base-v2')
@@ -34,11 +33,59 @@ def test_attribution():
     model.init_attribution_to_layer(idx=10, N_steps=50)
     texta = 'The dog runs after the kitten in the yard.'
     textb = 'Outside in the garden the cat is chased by the dog.'
-    A, tokens_a, tokens_b = model.explain_similarity(
-    texta, 
-    textb, 
-    move_to_cpu=True,
-    sim_measure='cos')
+    A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
 
-#test_attribution()
-test_space_shaping()
+
+def test_symbolic():
+    import amrlib
+    stog = amrlib.load_stog_model()
+    sents1 = ["The cat does not drink milk."]
+    sents2 = ['The cat drinks milk.']
+    graphs1 = stog.parse_sents(sents1)
+    graphs2 = stog.parse_sents(sents2)
+    from smatchpp import Smatchpp, data_helpers
+    from smatchpp.formalism.amr import tools as amrtools
+    reader = data_helpers.PenmanReader()
+    
+    class DummyReader():
+        def string2graph(self, input):
+            return input
+
+    dummy_reader = DummyReader()
+
+    standardizer = amrtools.AMRStandardizer()
+    subgraph_extractor = amrtools.AMRSubgraphExtractor()
+    measure = Smatchpp(graph_reader=dummy_reader) 
+    
+    for string_graph1_raw, string_graph2_raw in zip(graphs1, graphs2):
+        
+        string_graph1 = "\n".join([x for x in string_graph1_raw.split("\n") if not x.startswith("#")])
+        g1 = reader.string2graph(string_graph1)
+        g1 = standardizer.standardize(g1)
+        name_subgraph_dict1 = subgraph_extractor.all_subgraphs_by_name(g1)
+        name_subgraph_dict1["full"] = standardizer.standardize(reader.string2graph(string_graph1))
+
+        string_graph2 = "\n".join([x for x in string_graph2_raw.split("\n") if not x.startswith("#")])
+        g2 = reader.string2graph(string_graph2)
+        g2 = standardizer.standardize(g2)
+        name_subgraph_dict2 = subgraph_extractor.all_subgraphs_by_name(g2)
+        name_subgraph_dict2["full"] = standardizer.standardize(reader.string2graph(string_graph2))
+        
+        result = {}
+        
+        for graph_type in name_subgraph_dict1:
+            g1s = name_subgraph_dict1[graph_type]
+            g2s = name_subgraph_dict2[graph_type]
+            result[graph_type] = measure.score_pair(g1s, g2s)
+        print(string_graph1_raw)
+        print(string_graph2_raw)
+        print("main", result["full"]["main"]["F1"])
+        print("negation", result["POLARITY"]["main"]["F1"] )
+        print("focus", result["FOCUS"]["main"]["F1"])
+
+    
+
+
+test_attribution()
+#test_space_shaping()
+#test_symbolic()

@@ -3,7 +3,7 @@ import torch
 import os
 import json
 from tqdm import tqdm
-from typing import Tuple
+from typing import Tuple, Optional
 
 from xplain.attribution.utils import input_to_device
 from xplain.attribution import hooks
@@ -57,8 +57,8 @@ class ReferenceTransformer(models.Transformer):
 
 class XSTransformer(SentenceTransformer):
 
-    def forward(self, features: dict):
-        features = super().forward(features)
+    def forward(self, features: dict, **kwargs):
+        features = super().forward(features, **kwargs)
         emb = features['sentence_embedding']
         att = features['attention_mask']
         features.update({
@@ -88,7 +88,7 @@ class XSTransformer(SentenceTransformer):
             move_to_cpu: bool = True,
             verbose: bool = True
             ):
-        D = self[0].get_word_embedding_dimension()
+        D = embedding.shape[1]
         jacobi = []
         retain_graph = True
         for d in tqdm(range(D), disable = not verbose):
@@ -112,19 +112,24 @@ class XSTransformer(SentenceTransformer):
             return_lhs_terms: bool = False,
             move_to_cpu: bool = False,
             verbose: bool = True,
-            compress_embedding_dim: bool = True
+            compress_embedding_dim: bool = True,
+            dims: Optional[Tuple] = None,
+            device: torch.device = torch.device('cuda:0'),
+            **kwargs
             ):
 
         assert sim_measure in ['cos', 'dot'], f'invalid argument for sim_measure: {sim_measure}'
 
         self.intermediates.clear()
-        device = self[0].auto_model.embeddings.word_embeddings.weight.device
+        # device = self[0].auto_model.embeddings.word_embeddings.weight.device
 
         #TODO: this should be a method
         inpt_a = self[0].tokenize([text_a])
         input_to_device(inpt_a, device)
-        features_a = self.forward(inpt_a)
+        features_a = self.forward(inpt_a, **kwargs)
         emb_a = features_a['sentence_embedding']
+        if dims is not None:
+            emb_a = emb_a[:, dims[0]:dims[1]]
         interm_a = self.intermediates[0]
         J_a = self._compute_integrated_jacobian(emb_a, interm_a, move_to_cpu=move_to_cpu, verbose=verbose)
         D, Sa, Da = J_a.shape
@@ -135,8 +140,10 @@ class XSTransformer(SentenceTransformer):
 
         inpt_b = self[0].tokenize([text_b])
         input_to_device(inpt_b, device)
-        features_b = self.forward(inpt_b)
+        features_b = self.forward(inpt_b, **kwargs)
         emb_b = features_b['sentence_embedding']
+        if dims is not None:
+            emb_b = emb_b[:, dims[0]:dims[1]]
         interm_b = self.intermediates[1]
         J_b = self._compute_integrated_jacobian(emb_b, interm_b, move_to_cpu=move_to_cpu, verbose=verbose)
         _, Sb, Db = J_b.shape
@@ -167,6 +174,9 @@ class XSTransformer(SentenceTransformer):
         if return_lhs_terms:
             ref_a = features_a['reference']
             ref_b = features_b['reference']
+            if dims is not None:
+                ref_a = ref_a[dims[0]:dims[1]]
+                ref_b = ref_b[dims[0]:dims[1]]
             if move_to_cpu:
                 ref_a = ref_a.detach().cpu()
                 ref_b = ref_b.detach().cpu()
@@ -210,6 +220,29 @@ class XSTransformer(SentenceTransformer):
         return A, tokens_a, tokens_b
 
 
+    def token_sim_mat(self, text_a: str, text_b: str, layer: int, device: torch.device):
+
+        self[0].auto_model.config.output_hidden_states = True
+
+        inpt_a = self[0].tokenize([text_a])
+        inpt_b = self[0].tokenize([text_b])
+        input_to_device(inpt_a, device)
+        input_to_device(inpt_b, device)
+
+        with torch.no_grad():
+            emb_a = self[0].forward(inpt_a)['all_layer_embeddings'][layer][0]
+            emb_b = self[0].forward(inpt_b)['all_layer_embeddings'][layer][0]
+
+        A = torch.mm(emb_a, emb_b.t()).detach().cpu()
+
+        self[0].auto_model.config.output_hidden_states = False
+
+        tokens_a = self.tokenize_text(text_a)
+        tokens_b = self.tokenize_text(text_b)
+
+        return A, tokens_a, tokens_b
+
+
     def score(self, texts: Tuple[str]):
         self.eval()
         with torch.no_grad():
@@ -238,7 +271,6 @@ class XSRoberta(XSTransformer):
             )
         except AttributeError:
             raise AttributeError('The encoder model is not supported')
-
 
     def reset_attribution(self):
         if hasattr(self, 'hook'):
@@ -270,7 +302,6 @@ class XSMPNet(XSTransformer):
         except AttributeError:
             raise AttributeError('The encoder model is not supported')
 
-
     def reset_attribution(self):
         if hasattr(self, 'interpolation_hook'):
             self.interpolation_hook.remove()
@@ -278,3 +309,126 @@ class XSMPNet(XSTransformer):
             for hook in self.reshaping_hooks:
                 hook.remove()
             del self.reshaping_hooks
+
+
+class XGTE(XSTransformer):
+
+    def init_attribution_to_layer(self, idx: int, N_steps: int):
+
+        if hasattr(self, 'hook') and self.hook is not None:
+            raise AttributeError('a hook is already registered')
+        assert idx < len(self[0].auto_model.encoder.layer), f'the model does not have a layer {idx}'
+        try:
+            self.N_steps = N_steps
+            self.intermediates = []
+            self.hook = self[0].auto_model.encoder.layer[idx].register_forward_pre_hook(
+                hooks.gte_interpolation_hook(N=N_steps, outputs=self.intermediates)
+            )
+        except AttributeError:
+            raise AttributeError('The encoder model is not supported')
+
+    def reset_attribution(self):
+        if hasattr(self, 'hook'):
+            self.hook.remove()
+            self.hook = None
+        else:
+            print('No hook has been registered.')
+
+
+class XJina(XSTransformer):
+
+    def init_attribution_to_layer(self, idx: int, N_steps: int):
+
+        if hasattr(self, 'hook') and self.hook is not None:
+            raise AttributeError('a hook is already registered')
+        assert idx < len(self[0].auto_model.roberta.encoder.layers), f'the model does not have a layer {idx}'
+        try:
+            self.N_steps = N_steps
+            self.intermediates = []
+            self.hook = self[0].auto_model.roberta.encoder.layers[idx].register_forward_pre_hook(
+                hooks.roberta_interpolation_hook(N=N_steps, outputs=self.intermediates)
+            )
+        except AttributeError:
+            raise AttributeError('The encoder model is not supported')
+
+    def reset_attribution(self):
+        if hasattr(self, 'hook'):
+            self.hook.remove()
+            self.hook = None
+        else:
+            print('No hook has been registered.')
+
+
+class XGTR(XSTransformer):
+
+    def init_attribution_to_layer(self, idx: int, N_steps: int):
+
+        if hasattr(self, 'hook') and self.hook is not None:
+            raise AttributeError('a hook is already registered')
+        assert idx < len(self[0].auto_model.encoder.block), f'the model does not have a layer {idx}'
+        try:
+            self.N_steps = N_steps
+            self.intermediates = []
+            self.hook = self[0].auto_model.encoder.block[idx].register_forward_pre_hook(
+                hooks.roberta_interpolation_hook(N=N_steps, outputs=self.intermediates)
+            )
+        except AttributeError:
+            raise AttributeError('The encoder model is not supported')
+
+    def reset_attribution(self):
+        if hasattr(self, 'hook'):
+            self.hook.remove()
+            self.hook = None
+        else:
+            print('No hook has been registered.')
+
+
+if __name__ == '__main__':
+
+    from sentence_transformers.models import Pooling
+    from transformers import AutoModel
+
+    from .ReferenceTransformer import ReferenceTransformer
+    from .XSTransformer import XSMPNet, XSRoberta
+
+    device = torch.device('cuda:1')
+
+    # model = ReferenceTransformer('Alibaba-NLP/gte-multilingual-base')
+    model = ReferenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+    # model = ReferenceTransformer('jinaai/jina-embeddings-v3')
+    # model.auto_model.main_params_trainable = True
+    # for n, p in model.named_parameters():
+    #     if not p.requires_grad:
+    #         print(n)
+    # task = "text-matching"
+    text_a = "I am going for a hike with my dog."
+    text_b = "Mein Hund und ich gehen wander."
+
+    pooling = Pooling(model.get_word_embedding_dimension())
+    # xmodel = XGTE(modules=[model, pooling])
+    xmodel = XSRoberta(modules=[model, pooling])
+    xmodel.to(device)
+    A = xmodel.token_sim_mat(text_a, text_b, 10, device)
+    breakpoint()
+    # xmodel.init_attribution_to_layer(idx=11, N_steps=50)
+    # input_to_device(input, device)
+    # embeddings_b = xmodel.forward(
+    #     input,
+    #     # task=task,
+    #     )
+    # breakpoint()
+
+    # texta = 'This concept generalizes poorly.'
+    # textb = 'The shown principle generalizes to other areas.'
+
+    # A, ta, tb, ab, ra, rb, rr = xmodel.explain_similarity(
+    #     texta,
+    #     textb,
+    #     move_to_cpu=True,
+    #     return_lhs_terms=True,
+    #     sim_measure='cos',
+    #     device=device,
+    #     # task=task
+    #     )
+
+    # breakpoint()
