@@ -7,8 +7,8 @@ def test_space_shaping():
     ds = load_dataset("mteb/stsbenchmark-sts")
     some_pairs = list(zip([dic["sentence1"] for dic in ds["train"]], [dic["sentence2"] for dic in ds["train"]]))
     def bow_sim(x1, x2):
-        x1 = set(x1)
-        x2 = set(x2)
+        x1 = set(x1.split())
+        x2 = set(x2.split())
         inter = x1.intersection(x2)
         union = x1.union(x2)
         return len(inter) / len(union)
