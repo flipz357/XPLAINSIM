@@ -13,9 +13,9 @@ setup(
     author='Juri Opitz',
     author_email='opitz.sci@gmail.com',
     license='GPLv3',
-    packages=['xplain'],
+    packages=['xplain', 'xplain.spaceshaping', 'xplain.attribution'],
     long_description=long_description,
     long_description_content_type='text/markdown',
     python_requires=">=3.10",
-    install_requires=["torch", "transformers", "sentence-transformers", "numpy>=1.20.1", "scipy>=1.10.1"], 
+    install_requires=["torch", "transformers", "sentence-transformers", "numpy>=1.20.1", "scipy>=1.10.1", "datasets"], 
     classifiers=["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"])

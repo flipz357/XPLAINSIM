@@ -1,1 +1,1 @@
-from xplain.attribution.model import ReferenceTransformer, XSMPNet
+from xplain.attribution.model import *
