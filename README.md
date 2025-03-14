@@ -58,15 +58,15 @@ print(pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something
 ## To obtain attributions for an off-the-shelf transformer
 
 ```python
-    from sentence_transformers.models import Pooling
-    from xplain.attribution import utils, ReferenceTransformer, XSMPNet
-    transformer = ReferenceTransformer('sentence-transformers/all-mpnet-base-v2')
-    pooling = Pooling(transformer.get_word_embedding_dimension())
-    model = XSMPNet(modules=[transformer, pooling])
-    #model.to(torch.device('cuda:1'))
-    model.reset_attribution()
-    model.init_attribution_to_layer(idx=10, N_steps=50)
-    texta = 'The dog runs after the kitten in the yard.'
-    textb = 'Outside in the garden the cat is chased by the dog.'
-    A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
+from sentence_transformers.models import Pooling
+from xplain.attribution import utils, ReferenceTransformer, XSMPNet
+transformer = ReferenceTransformer('sentence-transformers/all-mpnet-base-v2')
+pooling = Pooling(transformer.get_word_embedding_dimension())
+model = XSMPNet(modules=[transformer, pooling])
+#model.to(torch.device('cuda:1'))
+model.reset_attribution()
+model.init_attribution_to_layer(idx=10, N_steps=50)
+texta = 'The dog runs after the kitten in the yard.'
+textb = 'Outside in the garden the cat is chased by the dog.'
+A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
 ```
