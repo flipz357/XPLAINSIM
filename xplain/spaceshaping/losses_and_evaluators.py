@@ -2,13 +2,15 @@ import torch
 from torch import nn, Tensor
 from typing import Iterable, Dict, Callable
 
-from sentence_transformers import SentenceTransformer, InputExample
+from sentence_transformers import SentenceTransformer
 from sentence_transformers import util as stutil
 from sentence_transformers.evaluation import SentenceEvaluator
 from sentence_transformers.util import batch_to_device
 import logging
 import numpy as np
 from xplain.spaceshaping import util
+import os
+import csv
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +54,11 @@ class DistilLoss(nn.Module):
         self.residual_dim = sentence_embedding_dimension - self.feature_dim
         
         if bias_inits is None:
-            biases = torch.ones(self.num_labels, requires_grad=True)
+            biases = torch.ones(self.num_labels, requires_grad=False)
             self.score_bias = nn.Parameter(biases)
         else:
             
-            biases = torch.tensor(bias_inits, requires_grad=True, dtype=torch.float32)
+            biases = torch.tensor(bias_inits, requires_grad=False, dtype=torch.float32)
             self.score_bias = nn.Parameter(biases)
 
         self.score_bias.to(model._target_device)
@@ -88,9 +90,7 @@ class DistilLoss(nn.Module):
         if labels is not None:
             loss = self.loss_fct(outputs, labels)
             return loss 
-        else:
-            # not needed
-            return reps, outputs
+        return reps, outputs
     
     def get_config_dict(self):
         return {'biases': self.score_bias}

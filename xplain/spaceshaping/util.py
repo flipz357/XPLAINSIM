@@ -22,8 +22,7 @@ def freeze_except_last_layers(model, n=2):
             lid = "layer." + name.split("layer.")[1].split(".")[0]
         if lid and lid in lastn:
             continue
-        else:
-            param.requires_grad = False
+        param.requires_grad = False
     
     return None
 

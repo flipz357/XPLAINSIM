@@ -1,21 +1,16 @@
 import torch
-from torch import nn, Tensor
-from typing import Iterable, Dict, Callable
-
-from sentence_transformers import SentenceTransformer, InputExample
-from sentence_transformers import util as stutil
-from sentence_transformers.evaluation import SentenceEvaluator
-from sentence_transformers.util import batch_to_device
+from sentence_transformers import SentenceTransformer
 import logging
 import numpy as np
-from xplain.spaceshaping import util
 from xplain.spaceshaping.losses_and_evaluators import DistilLoss, MultipleConsistencyLoss, DistilConsistencyEvaluator
+from xplain.spaceshaping import util
+
 logger = logging.getLogger(__name__)
 
 class PartitionedSentenceTransformer():
 
-    def __init__(self, basemodelstring="all-MiniLM-L12-v2", feature_names=[], 
-                 feature_dims=[], device="cpu", tune_n_layers=2, batch_size=32, learning_rate=0.0005,
+    def __init__(self,  feature_names: list, feature_dims:list, basemodelstring="all-MiniLM-L12-v2", 
+                 device="cpu", tune_n_layers=2, batch_size=32, learning_rate=0.001,
                  epochs=2, warmup_steps=1000, eval_steps=200, save_path=None, write_csv=None):
         
         assert len(feature_names) == len(feature_dims)
@@ -70,8 +65,6 @@ class PartitionedSentenceTransformer():
     def explain_similarity(self, xsent, ysent):
         xsent_encoded = self.model.encode(xsent)
         ysent_encoded = self.model.encode(ysent)
-        #collect preds
-        pred = []
 
         # cosine helper function
         def cosine_sim(mat1, mat2):
@@ -109,7 +102,7 @@ class PartitionedSentenceTransformer():
         features = ["global"] + self.feature_names + ["residual"]
         for i, x in enumerate(xsent):
             sims = preds[i]
-            jl = {k:v for k,v in zip(features, sims)}
+            jl = dict(zip(features, sims))
             jl["sent_a"] = x
             jl["sent_b"] = ysent[i]
             verbose.append(jl)
