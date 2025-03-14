@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 class PartitionedSentenceTransformer():
 
     def __init__(self, basemodelstring="all-MiniLM-L12-v2", feature_names=[], 
-                 feature_dims=[], device="cpu", tune_n_layers=2, batch_size=32, learning_rate=0.001,
-                 epochs=2, warmup_steps=1000, eval_steps=100, save_path=None, write_csv=None):
+                 feature_dims=[], device="cpu", tune_n_layers=2, batch_size=32, learning_rate=0.0005,
+                 epochs=2, warmup_steps=1000, eval_steps=200, save_path=None, write_csv=None):
         
         assert len(feature_names) == len(feature_dims)
         self.basemodelstring = basemodelstring

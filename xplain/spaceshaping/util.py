@@ -1,5 +1,6 @@
 from torch import Tensor
 import torch
+import torch.nn.functional as F
 
 def freeze_all_layers(model):
     for name, param in model.named_parameters():
@@ -31,6 +32,21 @@ def dist_sim(reps1: Tensor, reps2: Tensor):
     diff = torch.abs(reps1 - reps2)
     sim = 1.0 - torch.sum(diff, dim=1)
     return sim
+
+def normed_dist_sim(reps1: Tensor, reps2: Tensor):
+    """ based on manhatten distance """
+    #reps1_norm = torch.sum(reps1 ** 2, dim=1)
+    #reps2_norm = torch.sum(reps2 ** 2, dim=1)
+    #reps1_norm = torch.sqrt(reps1_norm)
+    #reps2_norm = torch.sqrt(reps2_norm)
+    #reps1_norm = reps1.norm(p=2, dim=1, keepdim=True)
+    
+    reps1 = F.normalize(reps1, p=2, dim=1)
+    reps2 = F.normalize(reps2, p=2, dim=1)
+    diff = torch.abs(reps1 - reps2)
+    sim = 1.0 - torch.sum(diff, dim=1)
+    return sim
+
 
 def prod_sim(reps1: Tensor, reps2: Tensor):
     """ dot product """
