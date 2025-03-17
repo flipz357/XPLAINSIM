@@ -1,16 +1,26 @@
 # Explaining Similarity
 
+## Overview of Repository
+
 ## Space Paritioning Example
 
 Here's a very simple example for training and inferring with a custom model.
 
-Needed: A training target. For every input text pair, a list with numbers. These numbers can be fine interpterable measurements. They are then used to structure the embedding space. In this example, we would like to build a model that reflects superficial semantic similarity in one part of its embedding, and deep semantic similarity in the other.
+Needed: A training target. For every input text pair, a list with numbers. These numbers can be fine interpterable measurements. They are then used to structure the embedding space. In this example, we would like to build a model that reflects superficial semantic similarity in one part of its embedding, similarity of named entities in another, and "deep" semantic similarity in the other. Concretely, we parition three features
+
+1. bag-of-words: Learns to reflect bag-of-words distance
+2. named entity similarity: Learns to reflect similarity of named entities
+3. (Not explicitly trained): Residual features for capturing the semantic similarity that makes for "the rest"
+
+Note that this is only a toy code, and the training happens on very little data, however, the feature paritioning will already have some effect.
 
 ```python
 from scipy.stats import pearsonr
 from xplain.spaceshaping import PartitionedSentenceTransformer
 from sentence_transformers import InputExample
 from datasets import load_dataset
+import spacy
+nlp=spacy.load("en_core_web_sm")
 
 # let's first load a toy train dataset of sentence pairs
 ds = load_dataset("mteb/stsbenchmark-sts")
@@ -27,18 +37,28 @@ def bow_sim(x1, x2):
 	union = x1.union(x2)
 	return len(inter) / len(union)
 
-target = [[bow_sim(x1, x2)] for x1, x2 in some_pairs]
+def ner_sim(x1, x2, docs1, docs2):
+	x1_ner = " ".join([ne.text for ne in docs1.ents])
+	x2_ner = " ".join([ne.text for ne in docs2.ents])
+	if not x1_ner and not x2_ner:
+		return 1.0
+	return bow_sim(x1_ner, x2_ner)
+
+docs1, docs2 = [nlp(x) for x, _ in some_pairs], [nlp(y) for _, y in some_pairs]
+target = [[bow_sim(x1, x2), ner_sim(x1, x2, docs1, docs2)] for x1, x2 in some_pairs]
 some_examples = [InputExample(texts=[x1, x2], label=target[i]) for (i, (x1, x2)) in enumerate(some_pairs)]
 
-target_dev = [[bow_sim(x1, x2)] for x1, x2 in some_pairs_dev]
+docs1_dev, docs2_dev = [nlp(x) for x, _ in some_pairs_dev], [nlp(y) for _, y in some_pairs_dev]
+target_dev = [[bow_sim(x1, x2), ner_sim(x1, x2, docs1_dev, docs2_dev)] for x1, x2 in some_pairs_dev]
 some_examples_dev = [InputExample(texts=[x1, x2], label=target_dev[i]) for (i, (x1, x2)) in enumerate(some_pairs_dev)]
 
 # init model
-pt = PartitionedSentenceTransformer(feature_names=["bow"], feature_dims=[32])
+pt = PartitionedSentenceTransformer(feature_names=["bow", "ner"], feature_dims=[32, 32])
 json = pt.explain_similarity([x for x, y in some_pairs_dev], [y for x, y in some_pairs_dev])
 
 # eval correlation to custom metric before training
 print(pearsonr([x.label[0] for x in some_examples_dev], [dic["bow"] for dic in json]))
+print(pearsonr([x.label[1] for x in some_examples_dev], [dic["ner"] for dic in json]))
 
 # print a toy example before training
 print(pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something"]))
@@ -49,8 +69,8 @@ pt.train(some_examples, some_examples_dev)
 # eval correlation to custom metric after train
 json = pt.explain_similarity([x for x, y in some_pairs_dev], [y for x, y in some_pairs_dev])
 print(pearsonr([x.label[0] for x in some_examples_dev],[dic["bow"] for dic in json]))
+print(pearsonr([x.label[1] for x in some_examples_dev], [dic["ner"] for dic in json]))
 
-print(pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something"]))
 # print a toy example after training
 print(pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something"]))
 ```
@@ -63,7 +83,6 @@ from xplain.attribution import utils, ReferenceTransformer, XSMPNet
 transformer = ReferenceTransformer('sentence-transformers/all-mpnet-base-v2')
 pooling = Pooling(transformer.get_word_embedding_dimension())
 model = XSMPNet(modules=[transformer, pooling])
-#model.to(torch.device('cuda:1'))
 model.reset_attribution()
 model.init_attribution_to_layer(idx=10, N_steps=50)
 texta = 'The dog runs after the kitten in the yard.'
