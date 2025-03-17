@@ -2,7 +2,32 @@
 
 ## Overview of Repository
 
-## Space Paritioning Example
+## Space partitioning
+
+The idea is as follows: You have a bunch of interpreatble measures (`my_metrics`) and wish that these are reflected within sub-embeddings (`features`), while not disturbing the overall similarity too much.
+
+```python
+from sentence_transformers import InputExample
+from xplain.spaceshaping import PartitionedSentenceTransformer
+
+# need some documents pairs, don't need to be paraphrases, or similar, just some documents
+list_with_strings, other_list_with_strings = ["abc",....], ["xyz",...]
+examples = []
+
+# compute the training/partitioning target
+for x, y in zip(list_with_strings, other_list_with_strings):
+	similarities = []
+	for metric in my_metrics:
+		similarities.append(metric.score(x, y))
+	examples.append(InputExample(texts=[x, y], label=similarities))
+
+# instantiate model and train, here we use 16 dimensions to express each metric
+pt = PartitionedSentenceTransformer(feature_names=[metric.name for metric in my_metrics], 
+                                    feature_dims=[16]*len(my_metrics))
+pt.train(examples)
+```
+
+### Space Paritioning Example
 
 Here's a very simple example for training and inferring with a custom model.
 
