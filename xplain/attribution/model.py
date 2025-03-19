@@ -9,7 +9,29 @@ from xplain.attribution.utils import input_to_device
 from xplain.attribution import hooks
 
 
+class ModelFactory():
 
+    def __init__(self):
+        return None
+    
+    @staticmethod
+    def show_options():
+        return list(ModelFactory._get_model_reference_dict().keys())
+    
+    @staticmethod
+    def _get_model_reference_dict():
+        dic = {"XSMPNet": (XSMPNet, 'sentence-transformers/all-mpnet-base-v2')}
+        return dic
+
+    @staticmethod
+    def build(modelname: str):
+        maybe_models = ModelFactory._get_model_reference_dict()[modelname]
+        assert models is not None
+        modelclass, reference = maybe_models
+        transformer = ReferenceTransformer(reference)
+        pooling = models.Pooling(transformer.get_word_embedding_dimension())
+        model = modelclass(modules=[transformer, pooling])
+        return model
 
 class ReferenceTransformer(models.Transformer):
     '''adds reference to batch but does not subtract its embeddings after forward'''

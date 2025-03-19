@@ -23,12 +23,9 @@ def test_space_shaping():
     print(pearsonr([x.label[0] for x in some_examples],[dic["bow"] for dic in json]))
 
 def test_attribution():
-    from sentence_transformers.models import Pooling
-    from xplain.attribution import utils, ReferenceTransformer, XSMPNet
-    transformer = ReferenceTransformer('sentence-transformers/all-mpnet-base-v2')
-    pooling = Pooling(transformer.get_word_embedding_dimension())
-    model = XSMPNet(modules=[transformer, pooling])
-    #model.to(torch.device('cuda:1'))
+    from xplain.attribution import ModelFactory
+    print(ModelFactory.show_options()) # shows available model names, use in build below
+    model = ModelFactory.build("XSMPNet")
     model.reset_attribution()
     model.init_attribution_to_layer(idx=10, N_steps=50)
     texta = 'The dog runs after the kitten in the yard.'
@@ -37,10 +34,13 @@ def test_attribution():
 
 
 def test_symbolic():
+    """
     import amrlib
     stog = amrlib.load_stog_model()
     sents1 = ["The cat does not drink milk."]
-    sents2 = ['The cat drinks milk.']
+    sents2 = ["The cat drinks milk."]
+    sents1 = ["Barack Obama holds a talk"]
+    sents2 = ["Hillary Clinton holds a talk"]
     graphs1 = stog.parse_sents(sents1)
     graphs2 = stog.parse_sents(sents2)
     from smatchpp import Smatchpp, data_helpers
@@ -82,7 +82,15 @@ def test_symbolic():
         print("main", result["full"]["main"]["F1"])
         print("negation", result["POLARITY"]["main"]["F1"] )
         print("focus", result["FOCUS"]["main"]["F1"])
-
+        print("NER", result["NER"]["main"]["F1"])
+    """
+    from xplain.symbolic.model import AMRSimilarity
+    explainer = AMRSimilarity()
+    sents1 = ["Barack Obama holds a talk"]
+    sents2 = ["Hillary Clinton holds a talk"]
+    exp = explainer.explain_similarity(sents1, sents2)
+    print(exp)
+    
     
 
 

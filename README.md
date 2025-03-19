@@ -18,11 +18,9 @@
 ## To obtain attributions for an off-the-shelf transformer<a id="attribution"></a>
 
 ```python
-from sentence_transformers.models import Pooling
-from xplain.attribution import utils, ReferenceTransformer, XSMPNet
-transformer = ReferenceTransformer('sentence-transformers/all-mpnet-base-v2')
-pooling = Pooling(transformer.get_word_embedding_dimension())
-model = XSMPNet(modules=[transformer, pooling])
+from xplain.attribution import ModelFactory
+print(ModelFactory.show_options()) # shows available model names, use in build below
+model = ModelFactory.build("XSMPNet")
 model.reset_attribution()
 model.init_attribution_to_layer(idx=10, N_steps=50)
 texta = 'The dog runs after the kitten in the yard.'
