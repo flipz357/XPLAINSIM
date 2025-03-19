@@ -2,35 +2,104 @@ def test_space_shaping():
     from scipy.stats import pearsonr
     from xplain.spaceshaping import PartitionedSentenceTransformer
     from sentence_transformers import InputExample
+
     pt = PartitionedSentenceTransformer(feature_names=["bow"], feature_dims=[100])
     from datasets import load_dataset
+
     ds = load_dataset("mteb/stsbenchmark-sts")
-    some_pairs = list(zip([dic["sentence1"] for dic in ds["train"]], [dic["sentence2"] for dic in ds["train"]]))
+    some_pairs = list(
+        zip(
+            [dic["sentence1"] for dic in ds["train"]],
+            [dic["sentence2"] for dic in ds["train"]],
+        )
+    )
+
     def bow_sim(x1, x2):
         x1 = set(x1.split())
         x2 = set(x2.split())
         inter = x1.intersection(x2)
         union = x1.union(x2)
         return len(inter) / len(union)
+
     target = [[bow_sim(x1, x2)] for x1, x2 in some_pairs]
-    some_examples = [InputExample(texts=[x1, x2], label=target[i]) for (i, (x1, x2)) in enumerate(some_pairs)]
+    some_examples = [
+        InputExample(texts=[x1, x2], label=target[i])
+        for (i, (x1, x2)) in enumerate(some_pairs)
+    ]
     json = pt.explain_similarity([x for x, y in some_pairs], [y for x, y in some_pairs])
     print(json)
-    print(pearsonr([x.label[0] for x in some_examples],[dic["bow"] for dic in json]))
+    print(pearsonr([x.label[0] for x in some_examples], [dic["bow"] for dic in json]))
     pt.train(some_examples, some_examples)
     json = pt.explain_similarity([x for x, y in some_pairs], [y for x, y in some_pairs])
     print(json)
-    print(pearsonr([x.label[0] for x in some_examples],[dic["bow"] for dic in json]))
+    print(pearsonr([x.label[0] for x in some_examples], [dic["bow"] for dic in json]))
+
 
 def test_attribution():
     from xplain.attribution import ModelFactory
-    print(ModelFactory.show_options()) # shows available model names, use in build below
-    model = ModelFactory.build("XSMPNet")
+    from xplain.attribution import plot_attributions
+    import torch
+
+    print(
+        ModelFactory.show_options()
+    )  # shows available model names, use in build below
+    model = ModelFactory.build("all-mpnet-base-v2")
     model.reset_attribution()
     model.init_attribution_to_layer(idx=10, N_steps=50)
-    texta = 'The dog runs after the kitten in the yard.'
-    textb = 'Outside in the garden the cat is chased by the dog.'
-    A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
+    texta = "The dog runs after the kitten in the yard."
+    textb = "Outside in the garden the cat is chased by the dog."
+    andrianos_test = False
+    device = torch.device("mps") if andrianos_test else torch.device("cuda:0")
+    A, tokens_a, tokens_b = model.explain_similarity(
+        texta, textb, move_to_cpu=True, sim_measure="cos", device=device
+    )
+    # tests for the postprocessing.
+    # f = plot_attributions(
+    #     A,
+    #     tokens_a,
+    #     tokens_b,
+    #     size=(5, 5),
+    #     # range=.3,
+    #     show_colorbar=True,
+    #     shrink_colorbar=0.5,
+    # )
+    # f.savefig("NoPostprocess.pdf", dpi=300, bbox_inches="tight")
+    # A, tokens_a, tokens_b = model.explain_similarity(
+    #     texta,
+    #     textb,
+    #     move_to_cpu=True,
+    #     sim_measure="cos",
+    #     postprocess_sparsify="SimpleAlign",
+    #     device=torch.device("mps"),
+    # )
+    # f = plot_attributions(
+    #     A,
+    #     tokens_a,
+    #     tokens_b,
+    #     size=(5, 5),
+    #     # range=.3,
+    #     show_colorbar=True,
+    #     shrink_colorbar=0.5,
+    # )
+    # f.savefig("SimpleAlignplot.pdf", dpi=300, bbox_inches="tight")
+    # A, tokens_a, tokens_b = model.explain_similarity(
+    #     texta,
+    #     textb,
+    #     move_to_cpu=True,
+    #     sim_measure="cos",
+    #     postprocess_sparsify="WasserAlign",
+    #     device=torch.device("mps"),
+    # )
+    # f = plot_attributions(
+    #     A,
+    #     tokens_a,
+    #     tokens_b,
+    #     size=(5, 5),
+    #     # range=.3,
+    #     show_colorbar=True,
+    #     shrink_colorbar=0.5,
+    # )
+    # f.savefig("WasserAlign.pdf", dpi=300, bbox_inches="tight")
 
 
 def test_symbolic():
@@ -46,7 +115,7 @@ def test_symbolic():
     from smatchpp import Smatchpp, data_helpers
     from smatchpp.formalism.amr import tools as amrtools
     reader = data_helpers.PenmanReader()
-    
+
     class DummyReader():
         def string2graph(self, input):
             return input
@@ -55,10 +124,10 @@ def test_symbolic():
 
     standardizer = amrtools.AMRStandardizer()
     subgraph_extractor = amrtools.AMRSubgraphExtractor()
-    measure = Smatchpp(graph_reader=dummy_reader) 
-    
+    measure = Smatchpp(graph_reader=dummy_reader)
+
     for string_graph1_raw, string_graph2_raw in zip(graphs1, graphs2):
-        
+
         string_graph1 = "\n".join([x for x in string_graph1_raw.split("\n") if not x.startswith("#")])
         g1 = reader.string2graph(string_graph1)
         g1 = standardizer.standardize(g1)
@@ -70,9 +139,9 @@ def test_symbolic():
         g2 = standardizer.standardize(g2)
         name_subgraph_dict2 = subgraph_extractor.all_subgraphs_by_name(g2)
         name_subgraph_dict2["full"] = standardizer.standardize(reader.string2graph(string_graph2))
-        
+
         result = {}
-        
+
         for graph_type in name_subgraph_dict1:
             g1s = name_subgraph_dict1[graph_type]
             g2s = name_subgraph_dict2[graph_type]
@@ -85,15 +154,14 @@ def test_symbolic():
         print("NER", result["NER"]["main"]["F1"])
     """
     from xplain.symbolic.model import AMRSimilarity
+
     explainer = AMRSimilarity()
     sents1 = ["Barack Obama holds a talk"]
     sents2 = ["Hillary Clinton holds a talk"]
     exp = explainer.explain_similarity(sents1, sents2, return_graphs=True)
     print(exp)
-    
-    
 
 
-#test_attribution()
-#test_space_shaping()
-test_symbolic()
+test_attribution()
+# test_space_shaping()
+# test_symbolic()
