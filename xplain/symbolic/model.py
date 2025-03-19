@@ -50,7 +50,7 @@ class AMRSimilarity():
         
         return parser, reader, standardizer
 
-    def explain_similarity(self, xsent: list, ysent:list):
+    def explain_similarity(self, xsent: list, ysent:list, return_graphs=None):
         graphs1 = self.parser.parse_sents(xsent)
         graphs2 = self.parser.parse_sents(ysent)
         print(graphs1[0])
@@ -76,60 +76,9 @@ class AMRSimilarity():
                 g1s = name_subgraph_dict1[graph_type]
                 g2s = name_subgraph_dict2[graph_type]
                 result[graph_type] = self.measure.score_pair(g1s, g2s)
+                if return_graphs:
+                    result[graph_type]["subgraph1"] = g1s
+                    result[graph_type]["subgraph2"] = g2s
             explanations.append(result)
 
         return result
-
-
-
-
-"""
-            import amrlib
-    stog = amrlib.load_stog_model()
-    sents1 = ["The cat does not drink milk."]
-    sents2 = ["The cat drinks milk."]
-    sents1 = ["Barack Obama holds a talk"]
-    sents2 = ["Hillary Clinton holds a talk"]
-    graphs1 = stog.parse_sents(sents1)
-    graphs2 = stog.parse_sents(sents2)
-    from smatchpp import Smatchpp, data_helpers
-    from smatchpp.formalism.amr import tools as amrtools
-    reader = data_helpers.PenmanReader()
-
-    class DummyReader():
-        def string2graph(self, input):
-            return input
-
-    dummy_reader = DummyReader()
-
-    standardizer = amrtools.AMRStandardizer()
-    subgraph_extractor = amrtools.AMRSubgraphExtractor()
-    measure = Smatchpp(graph_reader=dummy_reader)
-
-    for string_graph1_raw, string_graph2_raw in zip(graphs1, graphs2):
-
-        string_graph1 = "\n".join([x for x in string_graph1_raw.split("\n") if not x.startswith("#")])
-        g1 = reader.string2graph(string_graph1)
-        g1 = standardizer.standardize(g1)
-        name_subgraph_dict1 = subgraph_extractor.all_subgraphs_by_name(g1)
-        name_subgraph_dict1["full"] = standardizer.standardize(reader.string2graph(string_graph1))
-
-        string_graph2 = "\n".join([x for x in string_graph2_raw.split("\n") if not x.startswith("#")])
-        g2 = reader.string2graph(string_graph2)
-        g2 = standardizer.standardize(g2)
-        name_subgraph_dict2 = subgraph_extractor.all_subgraphs_by_name(g2)
-        name_subgraph_dict2["full"] = standardizer.standardize(reader.string2graph(string_graph2))
-
-        result = {}
-
-        for graph_type in name_subgraph_dict1:
-            g1s = name_subgraph_dict1[graph_type]
-            g2s = name_subgraph_dict2[graph_type]
-            result[graph_type] = measure.score_pair(g1s, g2s)
-        print(string_graph1_raw)
-        print(string_graph2_raw)
-        print("main", result["full"]["main"]["F1"])
-        print("negation", result["POLARITY"]["main"]["F1"] )
-        print("focus", result["FOCUS"]["main"]["F1"])
-        print("NER", result["NER"]["main"]["F1"])
-"""

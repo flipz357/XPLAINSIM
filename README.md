@@ -137,6 +137,7 @@ from xplain.symbolic.model import AMRSimilarity
 explainer = AMRSimilarity()
 sents1 = ["Barack Obama holds a talk"]
 sents2 = ["Hillary Clinton holds a talk"]
+# use return_graphs=True to also return all subgraph data
 exp = explainer.explain_similarity(sents1, sents2)
 print(exp)
 ```

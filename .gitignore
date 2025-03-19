@@ -1,5 +1,6 @@
 xplain/__pycache__/
 xplain/attribution/__pycache__/
 xplain/spaceshaping/__pycache__/
+xplain/symbolic/__pycache__/
 dist/
 xplain.egg-info/

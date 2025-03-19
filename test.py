@@ -88,12 +88,12 @@ def test_symbolic():
     explainer = AMRSimilarity()
     sents1 = ["Barack Obama holds a talk"]
     sents2 = ["Hillary Clinton holds a talk"]
-    exp = explainer.explain_similarity(sents1, sents2)
+    exp = explainer.explain_similarity(sents1, sents2, return_graphs=True)
     print(exp)
     
     
 
 
-test_attribution()
+#test_attribution()
 #test_space_shaping()
-#test_symbolic()
+test_symbolic()
