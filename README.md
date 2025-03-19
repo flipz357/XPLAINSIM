@@ -1,8 +1,36 @@
 # Explaining Similarity
 
-## Overview of Repository
+## Overview of Repository / Table of Contents
 
-## Space partitioning
+
+- [Installation](#requirements)
+- [**Attributions**](#attribution)
+- [**Space Shaping**](#space-shaping)
+    - [**Idea**](#space-shaping-idea)
+    - [**Toy Example**](#space-shaping-toy)
+- [FAQ](#faq)
+- [Citation](#citation)
+
+## Installation<a id="requirements"></a>
+
+## To obtain attributions for an off-the-shelf transformer<a id="attribution"></a>
+
+```python
+from sentence_transformers.models import Pooling
+from xplain.attribution import utils, ReferenceTransformer, XSMPNet
+transformer = ReferenceTransformer('sentence-transformers/all-mpnet-base-v2')
+pooling = Pooling(transformer.get_word_embedding_dimension())
+model = XSMPNet(modules=[transformer, pooling])
+model.reset_attribution()
+model.init_attribution_to_layer(idx=10, N_steps=50)
+texta = 'The dog runs after the kitten in the yard.'
+textb = 'Outside in the garden the cat is chased by the dog.'
+A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
+```
+
+## Space partitioning<a id="space-shaping"></a>
+
+### Idea<a id="space-shaping-idea"></a>
 
 The idea is as follows: You have a bunch of interpreatble measures (`my_metrics`) and wish that these are reflected within sub-embeddings (`features`), while not disturbing the overall similarity too much.
 
@@ -27,7 +55,7 @@ pt = PartitionedSentenceTransformer(feature_names=[metric.name for metric in my_
 pt.train(examples)
 ```
 
-### Space Paritioning Example
+### Space Paritioning Example<a id="space-shaping-toy"></a>
 
 Here's a very simple example for training and inferring with a custom model.
 
@@ -100,17 +128,6 @@ print(pearsonr([x.label[1] for x in some_examples_dev], [dic["ner"] for dic in j
 print(pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something"]))
 ```
 
-## To obtain attributions for an off-the-shelf transformer
+## FAQ<a id="faq"></a>
 
-```python
-from sentence_transformers.models import Pooling
-from xplain.attribution import utils, ReferenceTransformer, XSMPNet
-transformer = ReferenceTransformer('sentence-transformers/all-mpnet-base-v2')
-pooling = Pooling(transformer.get_word_embedding_dimension())
-model = XSMPNet(modules=[transformer, pooling])
-model.reset_attribution()
-model.init_attribution_to_layer(idx=10, N_steps=50)
-texta = 'The dog runs after the kitten in the yard.'
-textb = 'Outside in the garden the cat is chased by the dog.'
-A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
-```
+## Citation<a id="citation"></a>
