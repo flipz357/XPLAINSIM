@@ -8,6 +8,8 @@
 - [**Space Shaping**](#space-shaping)
     - [Idea](#space-shaping-idea)
     - [Toy Example](#space-shaping-toy)
+- [**Symbolic**](#symbolic)
+    - [AMR parsing and multi-subgraph metric](#amr)
 - [FAQ](#faq)
 - [Citation](#citation)
 
@@ -126,6 +128,19 @@ print(pearsonr([x.label[1] for x in some_examples_dev], [dic["ner"] for dic in j
 
 # print a toy example after training
 print(pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something"]))
+```
+
+## Symbolic<a id="symbolic"></a>
+
+### AMR Parsing and Multi-Subgraph Metric<a id="amr"></a>
+
+```python
+from xplain.symbolic.model import AMRSimilarity
+explainer = AMRSimilarity()
+sents1 = ["Barack Obama holds a talk"]
+sents2 = ["Hillary Clinton holds a talk"]
+exp = explainer.explain_similarity(sents1, sents2)
+print(exp)
 ```
 
 ## FAQ<a id="faq"></a>
