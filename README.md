@@ -3,13 +3,13 @@
 ## Overview of Repository / Table of Contents
 
 
-- [**Installation**](#requirements)
+- [Installation](#requirements)
 - [**Attributions**](#attribution)
 - [**Space Shaping**](#space-shaping)
-    - [**Idea**](#space-shaping-idea)
-    - [**Toy Example**](#space-shaping-toy)
-- [**FAQ**](#faq)
-- [**Citation**](#citation)
+    - [Idea](#space-shaping-idea)
+    - [Toy Example](#space-shaping-toy)
+- [FAQ**](#faq)
+- [Citation](#citation)
 
 ## Installation<a id="requirements"></a>
 
