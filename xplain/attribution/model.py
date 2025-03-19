@@ -25,7 +25,6 @@ class ModelFactory:
 
     @staticmethod
     def _get_model_reference_dict():
-        dic = {"XSMPNet": (XSMPNet, "sentence-transformers/all-mpnet-base-v2")}
         dic = {
             "all-mpnet-base-v2": (XSMPNet, "sentence-transformers/all-mpnet-base-v2")
         }

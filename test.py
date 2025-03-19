@@ -1,4 +1,4 @@
-def test_space_shaping():
+idef test_space_shaping():
     from scipy.stats import pearsonr
     from xplain.spaceshaping import PartitionedSentenceTransformer
     from sentence_transformers import InputExample
@@ -43,6 +43,7 @@ def test_attribution():
     print(
         ModelFactory.show_options()
     )  # shows available model names, use in build below
+    print(ModelFactory.show_options()) # shows available model names, use in build below
     model = ModelFactory.build("all-mpnet-base-v2")
     model.reset_attribution()
     model.init_attribution_to_layer(idx=10, N_steps=50)
