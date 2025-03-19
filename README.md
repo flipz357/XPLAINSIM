@@ -8,7 +8,7 @@
 - [**Space Shaping**](#space-shaping)
     - [Idea](#space-shaping-idea)
     - [Toy Example](#space-shaping-toy)
-- [FAQ**](#faq)
+- [FAQ](#faq)
 - [Citation](#citation)
 
 ## Installation<a id="requirements"></a>
