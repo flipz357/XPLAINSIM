@@ -20,7 +20,7 @@
 ```python
 from xplain.attribution import ModelFactory
 print(ModelFactory.show_options()) # shows available model names, use in build below
-model = ModelFactory.build("XSMPNet")
+model = ModelFactory.build("all-mpnet-base-v2")
 model.reset_attribution()
 model.init_attribution_to_layer(idx=10, N_steps=50)
 texta = 'The dog runs after the kitten in the yard.'
