@@ -1,4 +1,4 @@
-idef test_space_shaping():
+def test_space_shaping():
     from scipy.stats import pearsonr
     from xplain.spaceshaping import PartitionedSentenceTransformer
     from sentence_transformers import InputExample
