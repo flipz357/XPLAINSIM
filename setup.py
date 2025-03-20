@@ -22,7 +22,5 @@ setup(
                       "sentence-transformers", 
                       "numpy==1.26.4", 
                       "scipy>=1.10.1", 
-                      "datasets", 
-                      "pyemd", 
-                      "amrlib"], 
+                      "datasets"], #, #"amrlib", #"smatchpp", #"pyemd"]
     classifiers=["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"])

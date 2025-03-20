@@ -92,19 +92,19 @@ def bow_sim(x1, x2):
 	union = x1.union(x2)
 	return len(inter) / len(union)
 
-def ner_sim(x1, x2, docs1, docs2):
-	x1_ner = " ".join([ne.text for ne in docs1.ents])
-	x2_ner = " ".join([ne.text for ne in docs2.ents])
+def ner_sim(doc1, doc2):
+	x1_ner = " ".join([ne.text for ne in doc1.ents])
+	x2_ner = " ".join([ne.text for ne in doc2.ents])
 	if not x1_ner and not x2_ner:
 		return 1.0
 	return bow_sim(x1_ner, x2_ner)
 
 docs1, docs2 = [nlp(x) for x, _ in some_pairs], [nlp(y) for _, y in some_pairs]
-target = [[bow_sim(x1, x2), ner_sim(x1, x2, docs1, docs2)] for x1, x2 in some_pairs]
+target = [[bow_sim(x1, x2), ner_sim(docs1[i], docs2[i])] for i, (x1, x2) in enumerate(some_pairs)]
 some_examples = [InputExample(texts=[x1, x2], label=target[i]) for (i, (x1, x2)) in enumerate(some_pairs)]
 
 docs1_dev, docs2_dev = [nlp(x) for x, _ in some_pairs_dev], [nlp(y) for _, y in some_pairs_dev]
-target_dev = [[bow_sim(x1, x2), ner_sim(x1, x2, docs1_dev, docs2_dev)] for x1, x2 in some_pairs_dev]
+target_dev = [[bow_sim(x1, x2), ner_sim(docs1_dev[i], docs2_dev[i])] for i, (x1, x2) in enumerate(some_pairs_dev)]
 some_examples_dev = [InputExample(texts=[x1, x2], label=target_dev[i]) for (i, (x1, x2)) in enumerate(some_pairs_dev)]
 
 # init model
