@@ -33,13 +33,15 @@ class ModelFactory:
         return dic
 
     @staticmethod
-    def build(modelname: str):
+    def build(modelname: str, idx=10, N_steps=50):
         maybe_models = ModelFactory._get_model_reference_dict().get(modelname)
         assert models is not None
         modelclass, reference = maybe_models
         transformer = ReferenceTransformer(reference)
         pooling = models.Pooling(transformer.get_word_embedding_dimension())
         model = modelclass(modules=[transformer, pooling])
+        model.reset_attribution()
+        model.init_attribution_to_layer(idx=idx, N_steps=N_steps)
         return model
 
 
