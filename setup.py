@@ -17,5 +17,12 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     python_requires=">=3.10",
-    install_requires=["torch", "transformers", "sentence-transformers", "numpy==1.26.4", "scipy>=1.10.1", "datasets", "pyemd"], 
+    install_requires=["torch", 
+                      "transformers", 
+                      "sentence-transformers", 
+                      "numpy==1.26.4", 
+                      "scipy>=1.10.1", 
+                      "datasets", 
+                      "pyemd", 
+                      "amrlib"], 
     classifiers=["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"])

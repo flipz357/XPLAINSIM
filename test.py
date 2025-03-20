@@ -163,6 +163,6 @@ def test_symbolic():
     print(exp)
 
 
-test_attribution()
+#test_attribution()
 # test_space_shaping()
-# test_symbolic()
+test_symbolic()

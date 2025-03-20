@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 class AMRSimilarity():
 
     def __init__(self, parser_engine=None, measure=None, subgraph_extractor=None):
@@ -39,39 +43,45 @@ class AMRSimilarity():
     @staticmethod
     def _build_parser_engine():
         import amrlib
-        stog = amrlib.load_stog_model()
+        try:
+            stog = amrlib.load_stog_model()
+        except FileNotFoundError:
+            url = "https://github.com/bjascob/amrlib-models/releases/download/parse_xfm_bart_base-v0_1_0/model_parse_xfm_bart_base-v0_1_0.tar.gz"
+            logger.warning("Parser Model not accessible. I will try to download and install a default model from {}.".format(url))
+            amrlibpath = amrlib.__file__
+            amrlibpath = "/".join(amrlibpath.split("/")[:-1]) +"/"
+            import subprocess
+            subprocess.call(["mkdir", amrlibpath + "data"])
+            import urllib.request
+            #urllib.request.urlretrieve(url, amrlibpath + "data/" + "model_parse_xfm_bart_base-v0_1_0.tar.gz")
+            subprocess.call(["cp", amrlibpath + "data_save/model_parse_xfm_bart_base-v0_1_0.tar.gz", amrlibpath + "data/."])
+            subprocess.call(["tar", "-xvzf", amrlibpath + "data/model_parse_xfm_bart_base-v0_1_0.tar.gz", "-C", amrlibpath + "data/"])
+            subprocess.call(["mv", amrlibpath + "data/model_parse_xfm_bart_base-v0_1_0", amrlibpath + "data/model_stog"])
+            stog = amrlib.load_stog_model()
         parser = stog
         
         from smatchpp import data_helpers
         reader = data_helpers.PenmanReader()
-        
         from smatchpp.formalism.amr import tools as amrtools
-        standardizer = amrtools.AMRStandardizer()
-        
+        standardizer = amrtools.AMRStandardizer()        
         return parser, reader, standardizer
+    
+    def _raw_string_graph_to_subgraph_dict(self, string_graph_raw):
+        string_graph = "\n".join([x for x in string_graph_raw.split("\n") if not x.startswith("#")])
+        g = self.reader.string2graph(string_graph)
+        g = self.standardizer.standardize(g)
+        name_subgraph_dict = self.subgraph_extractor.all_subgraphs_by_name(g)
+        name_subgraph_dict["full"] = self.standardizer.standardize(self.reader.string2graph(string_graph))
+        return name_subgraph_dict
 
     def explain_similarity(self, xsent: list, ysent:list, return_graphs=None):
         graphs1 = self.parser.parse_sents(xsent)
         graphs2 = self.parser.parse_sents(ysent)
-        print(graphs1[0])
-        print(graphs2[0])
         explanations = []
         for string_graph1_raw, string_graph2_raw in zip(graphs1, graphs2):
-
-            string_graph1 = "\n".join([x for x in string_graph1_raw.split("\n") if not x.startswith("#")])
-            g1 = self.reader.string2graph(string_graph1)
-            g1 = self.standardizer.standardize(g1)
-            name_subgraph_dict1 = self.subgraph_extractor.all_subgraphs_by_name(g1)
-            name_subgraph_dict1["full"] = self.standardizer.standardize(self.reader.string2graph(string_graph1))
-
-            string_graph2 = "\n".join([x for x in string_graph2_raw.split("\n") if not x.startswith("#")])
-            g2 = self.reader.string2graph(string_graph2)
-            g2 = self.standardizer.standardize(g2)
-            name_subgraph_dict2 = self.subgraph_extractor.all_subgraphs_by_name(g2)
-            name_subgraph_dict2["full"] = self.standardizer.standardize(self.reader.string2graph(string_graph2))
-
+            name_subgraph_dict1 = self._raw_string_graph_to_subgraph_dict(string_graph1_raw)
+            name_subgraph_dict2 = self._raw_string_graph_to_subgraph_dict(string_graph2_raw)
             result = {}
-
             for graph_type in name_subgraph_dict1:
                 g1s = name_subgraph_dict1[graph_type]
                 g2s = name_subgraph_dict2[graph_type]
@@ -80,5 +90,4 @@ class AMRSimilarity():
                     result[graph_type]["subgraph1"] = g1s
                     result[graph_type]["subgraph2"] = g2s
             explanations.append(result)
-
         return result

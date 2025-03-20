@@ -1,5 +1,7 @@
 # Explaining Similarity
 
+A package for explaining and exploring semantic similarity through the eyes of text embedding models.
+
 ## Overview of Repository / Table of Contents
 
 
@@ -59,13 +61,13 @@ pt.train(examples)
 
 Here's a very simple example for training and inferring with a custom model.
 
-Needed: A training target. For every input text pair, a list with numbers. These numbers can be fine interpterable measurements. They are then used to structure the embedding space. In this example, we would like to build a model that reflects superficial semantic similarity in one part of its embedding, similarity of named entities in another, and "deep" semantic similarity in the other. Concretely, we parition three features
+Needed: A training target. For every input text pair, a list with numbers. These numbers can be fine-grained interpretable measurements. They are then used to structure the embedding space. In this example, we would like to build a model that reflects superficial semantic similarity in one part of its embedding, similarity of named entities in another, and "deep" semantic similarity in the other. Concretely, we paritition the embedding into three features/parts
 
-1. bag-of-words: Learns to reflect bag-of-words distance
-2. named entity similarity: Learns to reflect similarity of named entities
+1. Bag-of-words: Learns to reflect bag-of-words distance
+2. Named entity similarity: Learns to reflect similarity of named entities
 3. (Not explicitly trained): Residual features for capturing the semantic similarity that makes for "the rest"
 
-Note that this is only a toy code, and the training happens on very little data, however, the feature paritioning will already have some effect.
+Note that this is only a toy code, and the training happens on little data, however, the feature paritioning will already have some effect.
 
 ```python
 from scipy.stats import pearsonr
@@ -82,7 +84,7 @@ some_pairs = list(zip([dic["sentence1"] for dic in ds["train"]], [dic["sentence2
 # dev dataset of sentence pairs
 some_pairs_dev = list(zip([dic["sentence1"] for dic in ds["validation"]], [dic["sentence2"] for dic in ds["validation"]]))
 
-# let's build our target metrics that should be reflected within the embedding space
+# let's build our target metrics that should be reflected within the embedding space,
 def bow_sim(x1, x2):
 	x1 = set(x1.split())
 	x2 = set(x2.split())
@@ -121,7 +123,7 @@ pt.train(some_examples, some_examples_dev)
 
 # eval correlation to custom metric after train
 json = pt.explain_similarity([x for x, y in some_pairs_dev], [y for x, y in some_pairs_dev])
-print(pearsonr([x.label[0] for x in some_examples_dev],[dic["bow"] for dic in json]))
+print(pearsonr([x.label[0] for x in some_examples_dev], [dic["bow"] for dic in json]))
 print(pearsonr([x.label[1] for x in some_examples_dev], [dic["ner"] for dic in json]))
 
 # print a toy example after training
@@ -132,16 +134,24 @@ print(pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something
 
 ### AMR Parsing and Multi-Subgraph Metric<a id="amr"></a>
 
+The approch consists roughly in two steps:
+
+1. Parse each input text to an Abstract Meaning Representation Graph
+2. Match those Meaning Graphs with Graph Similarity Metrics, also with regard to aspectual subgraphs as elicited in AMR (e.g., Agent, Patient, Negation,...)
+
 ```python
 from xplain.symbolic.model import AMRSimilarity
 explainer = AMRSimilarity()
 sents1 = ["Barack Obama holds a talk"]
 sents2 = ["Hillary Clinton holds a talk"]
-# use return_graphs=True to also return all subgraph data
 exp = explainer.explain_similarity(sents1, sents2)
 print(exp)
 ```
 
+This will print a json dictionary with aspectual graph matching scores. 
+To also return the graphs and aspectual subgraphs, use `return_graphs=True` in `explain_similarity`.
+
 ## FAQ<a id="faq"></a>
+
 
 ## Citation<a id="citation"></a>
