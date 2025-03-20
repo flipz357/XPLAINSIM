@@ -32,7 +32,7 @@ class ModelFactory:
 
     @staticmethod
     def build(modelname: str):
-        maybe_models = ModelFactory._get_model_reference_dict()[modelname]
+        maybe_models = ModelFactory._get_model_reference_dict().get(modelname)
         assert models is not None
         modelclass, reference = maybe_models
         transformer = ReferenceTransformer(reference)
