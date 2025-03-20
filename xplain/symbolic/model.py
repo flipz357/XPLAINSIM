@@ -53,8 +53,7 @@ class AMRSimilarity():
             import subprocess
             subprocess.call(["mkdir", amrlibpath + "data"])
             import urllib.request
-            #urllib.request.urlretrieve(url, amrlibpath + "data/" + "model_parse_xfm_bart_base-v0_1_0.tar.gz")
-            subprocess.call(["cp", amrlibpath + "data_save/model_parse_xfm_bart_base-v0_1_0.tar.gz", amrlibpath + "data/."])
+            urllib.request.urlretrieve(url, amrlibpath + "data/" + "model_parse_xfm_bart_base-v0_1_0.tar.gz")
             subprocess.call(["tar", "-xvzf", amrlibpath + "data/model_parse_xfm_bart_base-v0_1_0.tar.gz", "-C", amrlibpath + "data/"])
             subprocess.call(["mv", amrlibpath + "data/model_parse_xfm_bart_base-v0_1_0", amrlibpath + "data/model_stog"])
             stog = amrlib.load_stog_model()
