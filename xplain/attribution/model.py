@@ -8,8 +8,8 @@ from typing import Tuple, Optional
 from xplain.attribution.utils import (
     input_to_device,
     trim_attributions_and_tokens,
-    simple_align,
-    wasserstein_align,
+    max_align,
+    flow_align,
 )
 from xplain.attribution import hooks
 
@@ -158,6 +158,7 @@ class XSTransformer(SentenceTransformer):
         postprocess_wasserstein_sparsify_threshold: float = 0.029,
         postprocess_trim_starting_tokens: int = 1,
         postprocess_trim_ending_tokens: int = 1,
+        postprocess_trim_if_no_postprocessing: bool = False,
         **kwargs,
     ):
 
@@ -248,7 +249,7 @@ class XSTransformer(SentenceTransformer):
                 ref_emb_a = torch.dot(emb_a[0], ref_b).item()
                 ref_emb_b = torch.dot(emb_b[0], ref_a).item()
                 ref_ref = torch.dot(ref_a, ref_b).item()
-            # if postprocess_sparsify == "WasserAlign":
+            # if postprocess_sparsify == "FlowAlign":
             #     A, tokens_a, tokens_b = trim_attributions_and_tokens(
             #         matrix=A,
             #         tokens_a=tokens_a,
@@ -256,8 +257,8 @@ class XSTransformer(SentenceTransformer):
             #         trim_start=postprocess_trim_starting_tokens,
             #         trim_end=postprocess_trim_ending_tokens,
             #     )
-            #     A = wasserstein_align(A, postprocess_wasserstein_sparsify_threshold)
-            # elif postprocess_sparsify == "SimpleAlign":
+            #     A = flow_align(A, postprocess_wasserstein_sparsify_threshold)
+            # elif postprocess_sparsify == "MaxAlign":
             #     A, tokens_a, tokens_b = trim_attributions_and_tokens(
             #         matrix=A,
             #         tokens_a=tokens_a,
@@ -265,10 +266,18 @@ class XSTransformer(SentenceTransformer):
             #         trim_start=postprocess_trim_starting_tokens,
             #         trim_end=postprocess_trim_ending_tokens,
             #     )
-            #     A = simple_align(A)
+            #     A = max_align(A)
+            # elif postprocess_sparsify == None and postprocess_trim_if_no_postprocessing:
+            #     A, tokens_a, tokens_b = trim_attributions_and_tokens(
+            #         matrix=A,
+            #         tokens_a=tokens_a,
+            #         tokens_b=tokens_b,
+            #         trim_start=postprocess_trim_starting_tokens,
+            #         trim_end=postprocess_trim_ending_tokens,
+            #     )
             return A, tokens_a, tokens_b, score, ref_emb_a, ref_emb_b, ref_ref
         else:
-            if postprocess_sparsify == "WasserAlign":
+            if postprocess_sparsify == "FlowAlign":
                 A, tokens_a, tokens_b = trim_attributions_and_tokens(
                     matrix=A,
                     tokens_a=tokens_a,
@@ -276,8 +285,8 @@ class XSTransformer(SentenceTransformer):
                     trim_start=postprocess_trim_starting_tokens,
                     trim_end=postprocess_trim_ending_tokens,
                 )
-                A = wasserstein_align(A, postprocess_wasserstein_sparsify_threshold)
-            elif postprocess_sparsify == "SimpleAlign":
+                A = flow_align(A, postprocess_wasserstein_sparsify_threshold)
+            elif postprocess_sparsify == "MaxAlign":
                 A, tokens_a, tokens_b = trim_attributions_and_tokens(
                     matrix=A,
                     tokens_a=tokens_a,
@@ -285,7 +294,15 @@ class XSTransformer(SentenceTransformer):
                     trim_start=postprocess_trim_starting_tokens,
                     trim_end=postprocess_trim_ending_tokens,
                 )
-                A = simple_align(A)
+                A = max_align(A)
+            elif postprocess_sparsify == None and postprocess_trim_if_no_postprocessing:
+                A, tokens_a, tokens_b = trim_attributions_and_tokens(
+                    matrix=A,
+                    tokens_a=tokens_a,
+                    tokens_b=tokens_b,
+                    trim_start=postprocess_trim_starting_tokens,
+                    trim_end=postprocess_trim_ending_tokens,
+                )
             return A, tokens_a, tokens_b
 
     def explain_by_decomposition(

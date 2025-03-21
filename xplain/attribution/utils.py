@@ -113,7 +113,7 @@ def trim_attributions_and_tokens(
     return trimmed_matrix, trimmed_tokens_a, trimmed_tokens_b
 
 
-def simple_align(attributions_matrix: torch.Tensor) -> np.ndarray:
+def max_align(attributions_matrix: torch.Tensor) -> np.ndarray:
     """Computes a simple sparcification alignment method through logical and between row wise and column wise maximum.
 
     Args:
@@ -161,7 +161,7 @@ def assign_one_to_max(
     return matched
 
 
-def wasserstein_align(
+def flow_align(
     attributions_matrix: torch.Tensor, threshold: float = 0.029
 ) -> np.ndarray:
     """Computes Wasserstein alignment based on attribution flow.

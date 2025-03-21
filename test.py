@@ -44,27 +44,25 @@ def test_attribution():
         ModelFactory.show_options()
     )  # shows available model names, use in build below
     print(ModelFactory.show_options()) # shows available model names, use in build below
-    model = ModelFactory.build("all-mpnet-base-v2")
-    model.reset_attribution()
-    model.init_attribution_to_layer(idx=10, N_steps=50)
+    model = ModelFactory.build("gte-multilingual-base")
     texta = "The dog runs after the kitten in the yard."
-    textb = "Outside in the garden the cat is chased by the dog."
-    andrianos_test = False
+    textb = "Im Garten rennt der Hund der Katze hinterher."
+    andrianos_test = True
     device = torch.device("mps") if andrianos_test else torch.device("cuda:0")
     A, tokens_a, tokens_b = model.explain_similarity(
-        texta, textb, move_to_cpu=True, sim_measure="cos", device=device
+        texta, textb, move_to_cpu=True, sim_measure="cos", device=device, postprocess_trim_if_no_postprocessing=True
     )
     # tests for the postprocessing.
-    # f = plot_attributions(
-    #     A,
-    #     tokens_a,
-    #     tokens_b,
-    #     size=(5, 5),
-    #     # range=.3,
-    #     show_colorbar=True,
-    #     shrink_colorbar=0.5,
-    # )
-    # f.savefig("NoPostprocess.pdf", dpi=300, bbox_inches="tight")
+    f = plot_attributions(
+        A,
+        tokens_a,
+        tokens_b,
+        size=(5, 5),
+        # range=.3,
+        show_colorbar=True,
+        shrink_colorbar=0.5,
+    )
+    f.savefig("NoPostprocess.png", dpi=300, bbox_inches="tight")
     # A, tokens_a, tokens_b = model.explain_similarity(
     #     texta,
     #     textb,
@@ -82,25 +80,25 @@ def test_attribution():
     #     show_colorbar=True,
     #     shrink_colorbar=0.5,
     # )
-    # f.savefig("SimpleAlignplot.pdf", dpi=300, bbox_inches="tight")
-    # A, tokens_a, tokens_b = model.explain_similarity(
-    #     texta,
-    #     textb,
-    #     move_to_cpu=True,
-    #     sim_measure="cos",
-    #     postprocess_sparsify="WasserAlign",
-    #     device=torch.device("mps"),
-    # )
-    # f = plot_attributions(
-    #     A,
-    #     tokens_a,
-    #     tokens_b,
-    #     size=(5, 5),
-    #     # range=.3,
-    #     show_colorbar=True,
-    #     shrink_colorbar=0.5,
-    # )
-    # f.savefig("WasserAlign.pdf", dpi=300, bbox_inches="tight")
+    # f.savefig("MaxAlignplot.png", dpi=300, bbox_inches="tight")
+    A, tokens_a, tokens_b = model.explain_similarity(
+        texta,
+        textb,
+        move_to_cpu=True,
+        sim_measure="cos",
+        postprocess_sparsify="FlowAlign",
+        device=torch.device("mps"),
+    )
+    f = plot_attributions(
+        A,
+        tokens_a,
+        tokens_b,
+        size=(5, 5),
+        # range=.3,
+        show_colorbar=True,
+        shrink_colorbar=0.5,
+    )
+    f.savefig("FlowAlign.png", dpi=300, bbox_inches="tight")
 
 
 def test_symbolic():
@@ -163,6 +161,6 @@ def test_symbolic():
     print(exp)
 
 
-#test_attribution()
+test_attribution()
 # test_space_shaping()
-test_symbolic()
+# test_symbolic()
