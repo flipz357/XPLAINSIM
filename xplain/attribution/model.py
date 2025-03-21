@@ -372,9 +372,14 @@ class XSRoberta(XSTransformer):
 
         if hasattr(self, "hook") and self.hook is not None:
             raise AttributeError("a hook is already registered")
-        assert idx < len(
+        
+        num_layers = len(
             self[0].auto_model.encoder.layer
-        ), f"the model does not have a layer {idx}"
+        )
+        if idx < 0: # We inverse the index (to allow -2, -3 initialisation)
+            assert abs(idx) < num_layers, f"the model does not have a layer {idx}. The model has {num_layers} available layers. "
+            idx = num_layers + idx # its always negative
+        assert idx < num_layers, f"the model does not have a layer {idx}. The model has {num_layers} available layers. "
         try:
             self.N_steps = N_steps
             self.intermediates = []
@@ -404,9 +409,13 @@ class XSMPNet(XSTransformer):
 
         if hasattr(self, "hook") and self.interpolation_hook is not None:
             raise AttributeError("a hook is already registered")
-        assert idx < len(
+        num_layers = len(
             self[0].auto_model.encoder.layer
-        ), f"the model does not have a layer {idx}"
+        )
+        if idx < 0: # We inverse the index (to allow -2, -3 initialisation)
+            assert abs(idx) < num_layers, f"the model does not have a layer {idx}. The model has {num_layers} available layers. "
+            idx = num_layers + idx # its always negative
+        assert idx < num_layers, f"the model does not have a layer {idx}. The model has {num_layers} available layers. "
         try:
             self.N_steps = N_steps
             self.intermediates = []
@@ -445,9 +454,13 @@ class XGTE(XSTransformer):
 
         if hasattr(self, "hook") and self.hook is not None:
             raise AttributeError("a hook is already registered")
-        assert idx < len(
+        num_layers = len(
             self[0].auto_model.encoder.layer
-        ), f"the model does not have a layer {idx}"
+        )
+        if idx < 0: # We inverse the index (to allow -2, -3 initialisation)
+            assert abs(idx) < num_layers, f"the model does not have a layer {idx}. The model has {num_layers} available layers. "
+            idx = num_layers + idx # its always negative
+        assert idx < num_layers, f"the model does not have a layer {idx}. The model has {num_layers} available layers. "
         try:
             self.N_steps = N_steps
             self.intermediates = []
@@ -475,9 +488,13 @@ class XJina(XSTransformer):
 
         if hasattr(self, "hook") and self.hook is not None:
             raise AttributeError("a hook is already registered")
-        assert idx < len(
+        num_layers = len(
             self[0].auto_model.roberta.encoder.layers
-        ), f"the model does not have a layer {idx}"
+        )
+        if idx < 0: # We inverse the index (to allow -2, -3 initialisation)
+            assert abs(idx) < num_layers, f"the model does not have a layer {idx}. The model has {num_layers} available layers. "
+            idx = num_layers + idx # its always negative
+        assert idx < num_layers, f"the model does not have a layer {idx}. The model has {num_layers} available layers. "
         try:
             self.N_steps = N_steps
             self.intermediates = []
@@ -507,9 +524,13 @@ class XGTR(XSTransformer):
 
         if hasattr(self, "hook") and self.hook is not None:
             raise AttributeError("a hook is already registered")
-        assert idx < len(
+        num_layers = len(
             self[0].auto_model.encoder.block
-        ), f"the model does not have a layer {idx}"
+        )
+        if idx < 0: # We inverse the index (to allow -2, -3 initialisation)
+            assert abs(idx) < num_layers, f"the model does not have a layer {idx}. The model has {num_layers} available layers. "
+            idx = num_layers + idx # its always negative
+        assert idx < num_layers, f"the model does not have a layer {idx}. The model has {num_layers} available layers. "
         try:
             self.N_steps = N_steps
             self.intermediates = []

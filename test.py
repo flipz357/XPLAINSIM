@@ -39,10 +39,7 @@ def test_attribution():
     from xplain.attribution import ModelFactory
     from xplain.attribution import plot_attributions
     import torch
-
-    print(
-        ModelFactory.show_options()
-    )  # shows available model names, use in build below
+    
     print(ModelFactory.show_options()) # shows available model names, use in build below
     model = ModelFactory.build("gte-multilingual-base")
     texta = "The dog runs after the kitten in the yard."
@@ -99,6 +96,26 @@ def test_attribution():
         shrink_colorbar=0.5,
     )
     f.savefig("FlowAlign.png", dpi=300, bbox_inches="tight")
+    
+def test_all_attribution_models_compile():
+    from xplain.attribution import ModelFactory
+    from xplain.attribution import plot_attributions
+    import torch
+    
+    texta = "The dog runs after the kitten in the yard."
+    textb = "Outside in the garden the cat is chased by the dog."
+    andrianos_test = True
+    neg_index = True
+    print("All available models are " + str(ModelFactory.show_options()))
+    device = torch.device("mps") if andrianos_test else torch.device("cuda:0")
+    for working_model_name in ModelFactory.show_options():
+        model = ModelFactory.build(working_model_name, idx=-2 if neg_index==True else 10)
+        A, tokens_a, tokens_b = model.explain_similarity(
+        texta, textb, move_to_cpu=True, sim_measure="cos", device=device, postprocess_trim_if_no_postprocessing=True
+        )
+        print("Succesfully loaded and predicted an attribution with model: " + working_model_name)
+    
+    print("All models were compiled succesfully.")
 
 
 def test_symbolic():
@@ -160,7 +177,7 @@ def test_symbolic():
     exp = explainer.explain_similarity(sents1, sents2, return_graphs=True)
     print(exp)
 
-
-test_attribution()
+test_all_attribution_models_compile()
+# test_attribution()
 # test_space_shaping()
 # test_symbolic()
