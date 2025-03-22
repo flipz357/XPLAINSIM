@@ -5,8 +5,8 @@ import json
 from tqdm import tqdm
 from typing import Tuple, Optional
 
-from xplain.attribution.utils import (
-    input_to_device,
+from xplain.attribution.utils import input_to_device
+from xplain.attribution.postprocessing import (
     trim_attributions_and_tokens,
     max_align,
     flow_align,

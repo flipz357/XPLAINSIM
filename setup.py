@@ -20,7 +20,5 @@ setup(
     install_requires=["torch", 
                       "transformers", 
                       "sentence-transformers", 
-                      "numpy==1.26.4", 
-                      "scipy>=1.10.1", 
-                      "datasets"], #, #"amrlib", #"smatchpp", #"pyemd"]
+                      ], #, #"amrlib", #"smatchpp", #"pyemd"]
     classifiers=["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"])
