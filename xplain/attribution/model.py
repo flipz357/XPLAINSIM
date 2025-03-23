@@ -11,6 +11,9 @@ from xplain.attribution.postprocessing import (
     trim_attributions_and_tokens,
     max_align,
     flow_align,
+    xlm_roberta_tokenizer_merge_subtokens,
+    adjust_matrix_to_full_tokens,
+    mpnet_tokenizer_merge_subtokens,
 )
 from xplain.attribution import hooks
 
@@ -36,13 +39,14 @@ class ModelFactory:
     @staticmethod
     def build(modelname: str, idx=10, N_steps=50):
         maybe_models = ModelFactory._get_model_reference_dict().get(modelname)
-        assert models is not None
+        assert maybe_models is not None
         modelclass, reference = maybe_models
         transformer = ReferenceTransformer(reference)
         pooling = models.Pooling(transformer.get_word_embedding_dimension())
         model = modelclass(modules=[transformer, pooling])
         model.reset_attribution()
         model.init_attribution_to_layer(idx=idx, N_steps=N_steps)
+        model.initialise_subtoken_to_tokens_method()
         return model
 
 
@@ -113,6 +117,9 @@ class XSTransformer(SentenceTransformer):
         raise NotImplementedError()
 
     def reset_attribution(self):
+        raise NotImplementedError()
+    
+    def initialise_subtoken_to_tokens_method(self):
         raise NotImplementedError()
 
     def tokenize_text(self, text: str):
@@ -323,6 +330,8 @@ class XSTransformer(SentenceTransformer):
         matrix: torch.Tensor,
         tokens_a: list,
         tokens_b: list,
+        subtokens_to_tokens: Optional[bool] = True,
+        subtokens_aggregation_method: Optional[str] = "mean",
         sparsification_method: Optional[str] = None,
         wasserstein_sparsify_threshold: float = 0.029,
         trim_starting_tokens: int = 1,
@@ -356,6 +365,9 @@ class XSTransformer(SentenceTransformer):
             trim_start=trim_starting_tokens,
             trim_end=trim_ending_tokens,
         )
+        
+        if subtokens_to_tokens:
+            matrix, tokens_a, tokens_b = self.merge_subtokens_and_adjust_matrix(matrix, tokens_a, tokens_b, subtokens_aggregation_method)
 
         if sparsification_method == "FlowAlign":
             matrix = flow_align(
@@ -366,6 +378,32 @@ class XSTransformer(SentenceTransformer):
             matrix = max_align(attributions_matrix=matrix)
 
         return matrix, tokens_a, tokens_b
+    
+    def merge_subtokens_and_adjust_matrix(self, A_align, tokens_a, tokens_b, aggregation='sum'):
+        """
+        Merges sub-tokens into their original tokens and adjusts the alignment matrix accordingly.
+        
+        Args:
+            A_align (torch.Tensor): The original alignment matrix between sub-tokens.
+            tokens_a (list of str): List of sub-tokens from the first sequence.
+            tokens_b (list of str): List of sub-tokens from the second sequence.
+            aggregation (str, optional): The method for aggregating alignment scores. 
+                                        Options are 'mean', 'min', and 'max'. Default is 'mean'.
+
+        Returns:
+            A_align_new (torch.Tensor): The adjusted alignment matrix between the original tokens.
+            tokens_a_merged (list of str): The merged tokens from the first sequence.
+            tokens_b_merged (list of str): The merged tokens from the second sequence.
+        """
+
+        # Merge sub-tokens to form original tokens
+        tokens_a_merged, index_map_a = self.token_to_subtoken_method(tokens_a)
+        tokens_b_merged, index_map_b = self.token_to_subtoken_method(tokens_b)
+
+        # Adjust the alignment matrix
+        A_align_new = adjust_matrix_to_full_tokens(A_align, index_map_a, index_map_b, aggregation)
+
+        return A_align_new, tokens_a_merged, tokens_b_merged
 
         
 
@@ -404,6 +442,10 @@ class XSRoberta(XSTransformer):
             self.hook = None
         else:
             print("No hook has been registered.")
+    
+    def initialise_subtoken_to_tokens_method(self):
+        if not hasattr(self, "token_to_subtoken_method"):
+            self.token_to_subtoken_method = xlm_roberta_tokenizer_merge_subtokens
 
 
 class XSMPNet(XSTransformer):
@@ -449,6 +491,10 @@ class XSMPNet(XSTransformer):
             for hook in self.reshaping_hooks:
                 hook.remove()
             del self.reshaping_hooks
+    
+    def initialise_subtoken_to_tokens_method(self):
+        if not hasattr(self, "token_to_subtoken_method"):
+            self.token_to_subtoken_method = mpnet_tokenizer_merge_subtokens
 
 
 class XGTE(XSTransformer):
@@ -483,6 +529,10 @@ class XGTE(XSTransformer):
             self.hook = None
         else:
             print("No hook has been registered.")
+    
+    def initialise_subtoken_to_tokens_method(self):
+        if not hasattr(self, "token_to_subtoken_method"):
+            self.token_to_subtoken_method = xlm_roberta_tokenizer_merge_subtokens
 
 
 class XJina(XSTransformer):

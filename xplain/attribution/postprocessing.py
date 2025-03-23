@@ -1,11 +1,129 @@
 import numpy as np
 from typing import Tuple, Optional, Dict, Any
 import torch
+import string
 
 try:
     import pyemd
 except ModuleNotFoundError:
     print("For using alignment to post-process attributions, please install pyemd")
+    
+
+def xlm_roberta_tokenizer_merge_subtokens(tokens):
+    """
+    Merges sub-tokens into their original tokens.
+    
+    Args:
+        tokens (list of str): List of sub-tokens.
+    
+    Returns:
+        merged_tokens (list of str): List of merged tokens.
+        index_map (list of list of int): Mapping from merged tokens to their original sub-token indices.
+    """
+    merged_tokens = []
+    index_map = []
+    current_token = ""
+    current_indices = []
+
+    for i, token in enumerate(tokens):
+        if token in ['CLS', 'EOS'] or token in string.punctuation:  # Special tokens and punctuation
+            if current_token:  # Add any current token being built
+                merged_tokens.append(current_token)
+                index_map.append(current_indices)
+            merged_tokens.append(token)  # Add the special token or punctuation
+            index_map.append([i])
+            current_token = ""
+            current_indices = []
+        elif token.startswith('▁'):  # Start of a new token
+            if current_token:  # If there's an existing token, add it to the list
+                merged_tokens.append(current_token)
+                index_map.append(current_indices)
+            current_token = token[1:]  # Remove the '▁' prefix
+            current_indices = [i]
+        else:
+            current_token += token
+            current_indices.append(i)
+
+    # Add the last token if it exists
+    if current_token:
+        merged_tokens.append(current_token)
+        index_map.append(current_indices)
+
+    return merged_tokens, index_map
+
+def mpnet_tokenizer_merge_subtokens(tokens):
+    """
+    Merges sub-tokens into their original tokens.  Used for: "all-mpnet-base-v2"
+    
+    Args:
+        tokens (list of str): List of sub-tokens.
+    
+    Returns:
+        merged_tokens (list of str): List of merged tokens.
+        index_map (list of list of int): Mapping from merged tokens to their original sub-token indices.
+    """
+    merged_tokens = []
+    index_map = []
+    current_token = ""
+    current_indices = []
+
+    for i, token in enumerate(tokens):
+        if token in ['CLS', 'EOS'] or token in string.punctuation:  # Special tokens and punctuation
+            if current_token:  # Add any current token being built
+                merged_tokens.append(current_token)
+                index_map.append(current_indices)
+            merged_tokens.append(token)  # Add the special token or punctuation
+            index_map.append([i])
+            current_token = ""
+            current_indices = []
+        elif token.startswith('##'): # extra subtoken
+            current_token += token[2:] # remove the extra '##'
+            current_indices.append(i)
+        else:
+            if current_token:  # If there's an existing token, add it to the list
+                merged_tokens.append(current_token)
+                index_map.append(current_indices)
+            current_token = token
+            current_indices = [i]
+
+    # Add the last token if it exists
+    if current_token:
+        merged_tokens.append(current_token)
+        index_map.append(current_indices)
+
+    return merged_tokens, index_map
+
+def adjust_matrix_to_full_tokens(A_align, index_map_a, index_map_b, aggregation):
+            """
+            Adjusts the alignment matrix based on the merged token indices.
+            
+            Args:
+                A_align (torch.Tensor): The original alignment matrix between TOKENS sub-tokens.
+                index_map_a (list of list of int): Mapping from merged tokens to their original sub-token indices for the first sequence.
+                index_map_b (list of list of int): Mapping from merged tokens to their original sub-token indices for the second sequence.
+                aggregation (str): The method for aggregating alignment scores.
+            
+            Returns:
+                new_matrix (torch.Tensor): The adjusted alignment matrix between the original tokens.
+            """
+            new_matrix = torch.zeros((len(index_map_a), len(index_map_b)))
+
+            for i, indices_a in enumerate(index_map_a):
+                for j, indices_b in enumerate(index_map_b):
+                    values = A_align[torch.tensor(indices_a)[:, None], torch.tensor(indices_b)]
+                    
+                    if aggregation == 'mean':
+                        new_matrix[i, j] = values.mean()
+                    elif aggregation == 'min':
+                        new_matrix[i, j] = values.min()
+                    elif aggregation == 'max':
+                        new_matrix[i, j] = values.max()
+                    elif aggregation == 'sum':
+                        new_matrix[i, j] = values.sum()
+                    else:
+                        raise ValueError("Invalid aggregation method. Choose from 'mean', 'min', 'max', 'sum'.")
+
+            return new_matrix
 
 def trim_attributions_and_tokens(
     matrix: torch.Tensor,
