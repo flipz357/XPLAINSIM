@@ -2,6 +2,7 @@ from sentence_transformers import models, SentenceTransformer
 import torch
 import os
 import json
+import numpy as np
 from tqdm import tqdm
 from typing import Tuple, Optional
 
@@ -154,14 +155,18 @@ class XSTransformer(SentenceTransformer):
         compress_embedding_dim: bool = True,
         dims: Optional[Tuple] = None,
         device: torch.device = torch.device("cuda:0"),
-        postprocess_sparsify: Optional[str] = None,
-        postprocess_wasserstein_sparsify_threshold: float = 0.029,
-        postprocess_trim_starting_tokens: int = 1,
-        postprocess_trim_ending_tokens: int = 1,
-        postprocess_trim_if_no_postprocessing: bool = False,
         **kwargs,
     ):
 
+        assert sim_measure in [
+            "cos",
+            "dot",
+        ], f"invalid argument for sim_measure: {sim_measure}"
+
+        self.intermediates.clear()
+        # device = self[0].auto_model.embeddings.word_embeddings.weight.device
+
+        # TODO: this should be a method
         assert sim_measure in [
             "cos",
             "dot",
@@ -249,60 +254,8 @@ class XSTransformer(SentenceTransformer):
                 ref_emb_a = torch.dot(emb_a[0], ref_b).item()
                 ref_emb_b = torch.dot(emb_b[0], ref_a).item()
                 ref_ref = torch.dot(ref_a, ref_b).item()
-            # if postprocess_sparsify == "FlowAlign":
-            #     A, tokens_a, tokens_b = trim_attributions_and_tokens(
-            #         matrix=A,
-            #         tokens_a=tokens_a,
-            #         tokens_b=tokens_b,
-            #         trim_start=postprocess_trim_starting_tokens,
-            #         trim_end=postprocess_trim_ending_tokens,
-            #     )
-            #     A = flow_align(A, postprocess_wasserstein_sparsify_threshold)
-            # elif postprocess_sparsify == "MaxAlign":
-            #     A, tokens_a, tokens_b = trim_attributions_and_tokens(
-            #         matrix=A,
-            #         tokens_a=tokens_a,
-            #         tokens_b=tokens_b,
-            #         trim_start=postprocess_trim_starting_tokens,
-            #         trim_end=postprocess_trim_ending_tokens,
-            #     )
-            #     A = max_align(A)
-            # elif postprocess_sparsify == None and postprocess_trim_if_no_postprocessing:
-            #     A, tokens_a, tokens_b = trim_attributions_and_tokens(
-            #         matrix=A,
-            #         tokens_a=tokens_a,
-            #         tokens_b=tokens_b,
-            #         trim_start=postprocess_trim_starting_tokens,
-            #         trim_end=postprocess_trim_ending_tokens,
-            #     )
             return A, tokens_a, tokens_b, score, ref_emb_a, ref_emb_b, ref_ref
         else:
-            if postprocess_sparsify == "FlowAlign":
-                A, tokens_a, tokens_b = trim_attributions_and_tokens(
-                    matrix=A,
-                    tokens_a=tokens_a,
-                    tokens_b=tokens_b,
-                    trim_start=postprocess_trim_starting_tokens,
-                    trim_end=postprocess_trim_ending_tokens,
-                )
-                A = flow_align(A, postprocess_wasserstein_sparsify_threshold)
-            elif postprocess_sparsify == "MaxAlign":
-                A, tokens_a, tokens_b = trim_attributions_and_tokens(
-                    matrix=A,
-                    tokens_a=tokens_a,
-                    tokens_b=tokens_b,
-                    trim_start=postprocess_trim_starting_tokens,
-                    trim_end=postprocess_trim_ending_tokens,
-                )
-                A = max_align(A)
-            elif postprocess_sparsify == None and postprocess_trim_if_no_postprocessing:
-                A, tokens_a, tokens_b = trim_attributions_and_tokens(
-                    matrix=A,
-                    tokens_a=tokens_a,
-                    tokens_b=tokens_b,
-                    trim_start=postprocess_trim_starting_tokens,
-                    trim_end=postprocess_trim_ending_tokens,
-                )
             return A, tokens_a, tokens_b
 
     def explain_by_decomposition(
@@ -364,7 +317,57 @@ class XSTransformer(SentenceTransformer):
             del embeddings
             torch.cuda.empty_cache()
         return s
+    
+    def postprocess_attributions(
+        self,
+        matrix: torch.Tensor,
+        tokens_a: list,
+        tokens_b: list,
+        sparsification_method: Optional[str] = None,
+        wasserstein_sparsify_threshold: float = 0.029,
+        trim_starting_tokens: int = 1,
+        trim_ending_tokens: int = 1
+    ) -> Tuple[np.ndarray, list, list]:
+        """
+        Postprocesses an attribution matrix and its associated tokens by trimming 
+        unwanted tokens and optionally applying a sparsification method.
 
+        Args:
+            matrix (torch.Tensor): The attribution matrix to be processed.
+            tokens_a (list): List of tokens corresponding to the rows of the matrix.
+            tokens_b (list): List of tokens corresponding to the columns of the matrix.
+            sparsification_method (Optional[str], optional): The sparsification method 
+                to apply. Can be "FlowAlign", "MaxAlign", or None. Defaults to None.
+            wasserstein_sparsify_threshold (float, optional): Threshold used in the 
+                FlowAlign method. Defaults to 0.029.
+            trim_starting_tokens (int, optional): Number of tokens to trim from the start 
+                of each token list. Defaults to 1.
+            trim_ending_tokens (int, optional): Number of tokens to trim from the end 
+                of each token list. Defaults to 1.
+
+        Returns:
+            Tuple[torch.Tensor, list, list]: A tuple containing the processed attribution 
+            matrix and the trimmed token lists (tokens_a, tokens_b).
+        """
+        matrix, tokens_a, tokens_b = trim_attributions_and_tokens(
+            matrix=matrix,
+            tokens_a=tokens_a,
+            tokens_b=tokens_b,
+            trim_start=trim_starting_tokens,
+            trim_end=trim_ending_tokens,
+        )
+
+        if sparsification_method == "FlowAlign":
+            matrix = flow_align(
+                attributions_matrix=matrix,
+                threshold=wasserstein_sparsify_threshold
+            )
+        elif sparsification_method == "MaxAlign":
+            matrix = max_align(attributions_matrix=matrix)
+
+        return matrix, tokens_a, tokens_b
+
+        
 
 class XSRoberta(XSTransformer):
 

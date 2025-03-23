@@ -110,10 +110,11 @@ def test_all_attribution_models_compile():
     device = torch.device("mps") if andrianos_test else torch.device("cuda:0")
     for working_model_name in ModelFactory.show_options():
         model = ModelFactory.build(working_model_name, idx=-2 if neg_index==True else 10)
-        A, tokens_a, tokens_b = model.explain_similarity(
-        texta, textb, move_to_cpu=True, sim_measure="cos", device=device, postprocess_trim_if_no_postprocessing=True
-        )
-        print("Succesfully loaded and predicted an attribution with model: " + working_model_name)
+        A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure="cos", device=device)
+        A_pp, tokens_a_pp, tokens_b_pp = model.postprocess_attributions(A, tokens_a, tokens_b, sparsification_method="MaxAlign")
+        assert A.shape != A_pp.shape, f"Identical shapes between postprocessed and raw attributions for {working_model_name}"
+        assert len(tokens_a_pp) == (len(tokens_a) - 2) and (len(tokens_b_pp) == len(tokens_b) - 2), f"tokens have not been preprocessed correctly for {working_model_name}"
+        print("Succesfully loaded, predicted an attribution and later postprocessed with model: " + working_model_name)
     
     print("All models were compiled succesfully.")
 
