@@ -31,21 +31,29 @@ class ModelFactory:
     def _get_model_reference_dict():
         dic = {
             "all-mpnet-base-v2": (XSMPNet, "sentence-transformers/all-mpnet-base-v2"),
-            "xlm-roberta-base": (XSRoberta, "FacebookAI/xlm-roberta-base"),
-            "gte-multilingual-base": (XGTE, "Alibaba-NLP/gte-multilingual-base")
+            "xlm-roberta-base": (XSDefaultEncoder, "FacebookAI/xlm-roberta-base"),
+            "multilingual-e5-base" : (XSDefaultEncoder, "intfloat/multilingual-e5-base"),
+            "paraphrase-multilingual-mpnet-base" : (XSDefaultEncoder, "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"),
+            "paraphrase-multilingual-MiniLM" : (XSDefaultEncoder, "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"),
+            "gte-multilingual-base": (XGTE, "Alibaba-NLP/gte-multilingual-base"),
+            "sentence-transformers/all-mpnet-base-v2": (XSMPNet, "sentence-transformers/all-mpnet-base-v2"),
+            "FacebookAI/xlm-roberta-base": (XSDefaultEncoder, "FacebookAI/xlm-roberta-base"),
+            "intfloat/multilingual-e5-base" : (XSDefaultEncoder, "intfloat/multilingual-e5-base"),
+            "sentence-transformers/paraphrase-multilingual-mpnet-base-v2" : (XSDefaultEncoder, "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"),
+            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" : (XSDefaultEncoder, "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"),
+            "Alibaba-NLP/gte-multilingual-base": (XGTE, "Alibaba-NLP/gte-multilingual-base")
         }
         return dic
 
     @staticmethod
     def build(modelname: str, idx=10, N_steps=50):
-        maybe_models = ModelFactory._get_model_reference_dict().get(modelname)
-        assert maybe_models is not None
+        maybe_models = ModelFactory._get_model_reference_dict().get(modelname, (XSDefaultEncoder, modelname)) # added default model support. 
         modelclass, reference = maybe_models
         transformer = ReferenceTransformer(reference)
         pooling = models.Pooling(transformer.get_word_embedding_dimension())
-        model = modelclass(modules=[transformer, pooling])
+        model = modelclass(modules=[transformer, pooling]) # if model is unsupported it will error out in the next two lines
         model.reset_attribution()
-        model.init_attribution_to_layer(idx=idx, N_steps=N_steps)
+        model.init_attribution_to_layer(idx=idx, N_steps=N_steps) 
         model.initialise_subtoken_to_tokens_method()
         return model
 
@@ -407,7 +415,7 @@ class XSTransformer(SentenceTransformer):
 
         
 
-class XSRoberta(XSTransformer):
+class XSDefaultEncoder(XSTransformer):
 
     def init_attribution_to_layer(self, idx: int, N_steps: int):
 

@@ -101,13 +101,13 @@ def test_all_attribution_models_compile():
     from xplain.attribution import plot_attributions
     import torch
     
-    texta = "The dog runs after the kitten in the yard. There is a testamente."
+    texta = "The dog runs after the kitten in the yard. There is a testamente but what else do we neederento to testerente? "
     textb = "Outside in the garden the cat is chased by the dog."
     andrianos_test = True
     neg_index = True
     print("All available models are " + str(ModelFactory.show_options()))
     device = torch.device("mps") if andrianos_test else torch.device("cuda:0")
-    for working_model_name in ModelFactory.show_options():
+    for working_model_name in ModelFactory.show_options()[:len(ModelFactory.show_options()) // 2] + ["FacebookAI/xlm-roberta-large"]:
         model = ModelFactory.build(working_model_name, idx=-2 if neg_index==True else 10)
         A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure="cos", device=device)
         A_pp, tokens_a_pp, tokens_b_pp = model.postprocess_attributions(A, tokens_a, tokens_b, sparsification_method="MaxAlign")
@@ -179,7 +179,7 @@ def test_symbolic():
     exp = explainer.explain_similarity(sents1, sents2, return_graphs=True)
     print(exp)
 
-# test_all_attribution_models_compile()
-test_attribution()
+test_all_attribution_models_compile()
+# test_attribution()
 # test_space_shaping()
 # test_symbolic()
