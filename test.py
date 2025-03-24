@@ -47,9 +47,9 @@ def test_attribution():
     andrianos_test = True
     device = torch.device("mps") if andrianos_test else torch.device("cuda:0")
     A, tokens_a, tokens_b = model.explain_similarity(
-        texta, textb, move_to_cpu=True, sim_measure="cos", device=device, postprocess_trim_if_no_postprocessing=True
-    )
+        texta, textb, move_to_cpu=True, sim_measure="cos", device=device)
     # tests for the postprocessing.
+    A, tokens_a, tokens_b = model.postprocess_attributions(A, tokens_a, tokens_b, subtokens_aggregation_method="sum")
     f = plot_attributions(
         A,
         tokens_a,
@@ -83,15 +83,14 @@ def test_attribution():
         textb,
         move_to_cpu=True,
         sim_measure="cos",
-        postprocess_sparsify="FlowAlign",
         device=torch.device("mps"),
     )
+    A, tokens_a, tokens_b = model.postprocess_attributions(A, tokens_a, tokens_b, subtokens_aggregation_method="sum", sparsification_method="FlowAlign")
     f = plot_attributions(
         A,
         tokens_a,
         tokens_b,
         size=(5, 5),
-        # range=.3,
         show_colorbar=True,
         shrink_colorbar=0.5,
     )
@@ -180,7 +179,7 @@ def test_symbolic():
     exp = explainer.explain_similarity(sents1, sents2, return_graphs=True)
     print(exp)
 
-test_all_attribution_models_compile()
-# test_attribution()
+# test_all_attribution_models_compile()
+test_attribution()
 # test_space_shaping()
 # test_symbolic()

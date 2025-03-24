@@ -333,7 +333,7 @@ class XSTransformer(SentenceTransformer):
         subtokens_to_tokens: Optional[bool] = True,
         subtokens_aggregation_method: Optional[str] = "mean",
         sparsification_method: Optional[str] = None,
-        wasserstein_sparsify_threshold: float = 0.029,
+        flowalign_sparsify_threshold: float = 0.029,
         trim_starting_tokens: int = 1,
         trim_ending_tokens: int = 1
     ) -> Tuple[np.ndarray, list, list]:
@@ -372,7 +372,7 @@ class XSTransformer(SentenceTransformer):
         if sparsification_method == "FlowAlign":
             matrix = flow_align(
                 attributions_matrix=matrix,
-                threshold=wasserstein_sparsify_threshold
+                threshold=flowalign_sparsify_threshold
             )
         elif sparsification_method == "MaxAlign":
             matrix = max_align(attributions_matrix=matrix)
