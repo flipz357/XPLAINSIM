@@ -46,14 +46,14 @@ class ModelFactory:
         return dic
 
     @staticmethod
-    def build(modelname: str, idx=10, N_steps=50):
+    def build(modelname: str, layer_idx=-2, N_steps=50):
         maybe_models = ModelFactory._get_model_reference_dict().get(modelname, (XSDefaultEncoder, modelname)) # added default model support. 
         modelclass, reference = maybe_models
         transformer = ReferenceTransformer(reference)
         pooling = models.Pooling(transformer.get_word_embedding_dimension())
         model = modelclass(modules=[transformer, pooling]) # if model is unsupported it will error out in the next two lines
         model.reset_attribution()
-        model.init_attribution_to_layer(idx=idx, N_steps=N_steps) 
+        model.init_attribution_to_layer(idx=layer_idx, N_steps=N_steps) 
         model.initialise_subtoken_to_tokens_method()
         return model
 
