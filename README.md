@@ -22,10 +22,12 @@ A package for explaining and exploring semantic similarity through the eyes of t
 ```python
 from xplain.attribution import ModelFactory
 print(ModelFactory.show_options()) # shows available model names, use in build below
-model = ModelFactory.build("all-mpnet-base-v2", idx=10, N_steps=50)
+model = ModelFactory.build("all-mpnet-base-v2")
 texta = 'The dog runs after the kitten in the yard.'
 textb = 'Outside in the garden the cat is chased by the dog.'
 A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
+A, tokens_a, tokens_b = model.postprocess_attributions(A, tokens_a, tokens_b, sparsification_method="FlowAlign")
+# Last line is optional, postprocess attributions to discretize and/or merge subtokens into original tokens.
 ```
 
 ## Space partitioning<a id="space-shaping"></a>
