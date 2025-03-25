@@ -70,7 +70,7 @@ class AMRSimilarity():
         g = self.reader.string2graph(string_graph)
         g = self.standardizer.standardize(g)
         name_subgraph_dict = self.subgraph_extractor.all_subgraphs_by_name(g)
-        name_subgraph_dict["full"] = self.standardizer.standardize(self.reader.string2graph(string_graph))
+        name_subgraph_dict["global"] = self.standardizer.standardize(self.reader.string2graph(string_graph))
         return name_subgraph_dict
 
     def explain_similarity(self, xsent: list, ysent:list, return_graphs=None):

@@ -13,12 +13,12 @@ setup(
     author='Juri Opitz',
     author_email='opitz.sci@gmail.com',
     license='GPLv3',
-    packages=['xplain', 'xplain.spaceshaping', 'xplain.attribution'],
+    packages=['xplain', 'xplain.spaceshaping', 'xplain.attribution', 'xplain.symbolic'],
     long_description=long_description,
     long_description_content_type='text/markdown',
     python_requires=">=3.10",
     install_requires=["torch", 
                       "transformers", 
                       "sentence-transformers", 
-                      ], #, #"amrlib", #"smatchpp", #"pyemd"]
+                      "datasets"], #, #"amrlib", #"smatchpp", #"pyemd"]
     classifiers=["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"])
