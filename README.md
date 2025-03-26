@@ -22,7 +22,7 @@ A package for explaining and exploring semantic similarity through the eyes of t
 ```python
 from xplain.attribution import ModelFactory
 print(ModelFactory.show_options()) # shows available model names, use in build below
-model = ModelFactory.build("all-mpnet-base-v2")
+model = ModelFactory.build("huggingface_id") # e.g sentence-transformers/all-mpnet-base-v2
 texta = 'The dog runs after the kitten in the yard.'
 textb = 'Outside in the garden the cat is chased by the dog.'
 A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
