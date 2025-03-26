@@ -17,6 +17,11 @@ A package for explaining and exploring semantic similarity through the eyes of t
 
 ## Installation<a id="requirements"></a>
 
+To install our package you can install using:
+
+```
+pip install xplainsim
+```
 ## To obtain attributions for an off-the-shelf transformer<a id="attribution"></a>
 
 ```python
