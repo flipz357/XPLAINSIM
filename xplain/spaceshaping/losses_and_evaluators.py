@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class DistilLoss(nn.Module):
     """
-    Distill metrics, Decompose output space
+    Parameter-free loss module to distill metrics, decompose output space
 
     :param model: SentenceTransformer model
     :param sentence_embedding_dimension: Dimension of your sentence embeddings
@@ -25,7 +25,7 @@ class DistilLoss(nn.Module):
     :param feature_dim: Dimension of a feature
     :param loss_fct: Optional: Custom pytorch loss function. If not set, uses nn.MSELoss()
     :param sim_fct: Optional: Custom similarity function. If not set, uses Manhatten Sim
-    Example::
+     Example::
         from sentence_transformers import SentenceTransformer, SentencesDataset, losses
         from sentence_transformers.readers import InputExample
         model = SentenceTransformer('distilbert-base-nli-mean-tokens')
@@ -38,21 +38,19 @@ class DistilLoss(nn.Module):
     def __init__(self,
                  model: SentenceTransformer,
                  sentence_embedding_dimension: int,
-                 num_labels: int,
-                 feature_dim: int = 16,
+                 feature_dims: list[int],
                  bias_inits: np.array = None,
                  loss_fct: Callable = nn.MSELoss(),
                  sim_fct: Callable = util.co_sim): #dist_sim
         super(DistilLoss, self).__init__()
         self.model = model
-        self.num_labels = num_labels
         self.sentence_embedding_dimension = sentence_embedding_dimension
 
         self.loss_fct = loss_fct
         self.sim_fct = sim_fct
-        self.feature_dim = feature_dim
-        self.residual_dim = sentence_embedding_dimension - self.feature_dim
-        
+        self.feature_dims = feature_dims
+        self.num_labels = len(feature_dims)
+
         if bias_inits is None:
             biases = torch.ones(self.num_labels, requires_grad=False)
             self.score_bias = nn.Parameter(biases)
@@ -65,23 +63,28 @@ class DistilLoss(nn.Module):
     
 
     def forward(self, sentence_features: Iterable[Dict[str, Tensor]], labels: Tensor):
-        
+        """Compute the partitnioning loss sim(sub_embeddings) vs target metrics"""
+
         reps = [self.model(sentence_feature)['sentence_embedding'] for sentence_feature in sentence_features]
         rep_a, rep_b = reps
         
         sims = []
+        start = 0
         for i in range(self.num_labels):
             
+            # get dimensionality of feature
+            feature_dim = self.feature_dims[i]
+
             # get two subembeddings
-            start = i * self.feature_dim
-            stop = (i+1) * self.feature_dim
+            stop = start + feature_dim
             rep_ax = rep_a[:, start:stop]
             rep_bx = rep_b[:, start:stop]
 
             # and compute their similariy
             sim = self.sim_fct(rep_ax, rep_bx)
             sims.append(sim)
-        
+            start += feature_dim
+
         # sims: (n_features x n_batch)
         # output: (n_batch x n_features)
         outputs = torch.stack(sims).T 
