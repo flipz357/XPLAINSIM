@@ -9,12 +9,12 @@ logger = logging.getLogger(__name__)
 
 class PartitionedSentenceTransformer():
 
-    def __init__(self,  feature_names: list, feature_dims:list, basemodelstring="all-MiniLM-L12-v2", 
+    def __init__(self,  feature_names: list, feature_dims:list, base_model_uri="all-MiniLM-L12-v2", 
                  device="cpu", tune_n_layers=2, batch_size=32, learning_rate=0.001,
-                 epochs=2, warmup_steps=1000, eval_steps=200, save_path=None, write_csv=None):
+                 epochs=2, warmup_steps=1000, eval_steps=200, save_path=None, write_csv=None, sim_fct=util.co_sim):
         
         assert len(feature_names) == len(feature_dims)
-        self.basemodelstring = basemodelstring
+        self.base_model_uri = base_model_uri
         self.feature_names = feature_names
         self.n_features = len(feature_names)
         self.feature_dims = feature_dims
@@ -27,23 +27,24 @@ class PartitionedSentenceTransformer():
         self.eval_steps = eval_steps
         self.save_path = save_path
         self.write_csv = write_csv
+        self.sim_fct = sim_fct
         self.init_models()
 
     def init_models(self):
-        self.model = SentenceTransformer(self.basemodelstring, device=self.device)
-        self.control = SentenceTransformer(self.basemodelstring, device=self.device)
+        self.model = SentenceTransformer(self.base_model_uri, device=self.device)
+        self.control = SentenceTransformer(self.base_model_uri, device=self.device)
         util.freeze_except_last_layers(self.model, self.tune_n_layers)
         util.freeze_all_layers(self.control)
 
     def train(self, train_examples, dev_examples):
-        #self.init_models()
+        
         train_dataloader = torch.utils.data.DataLoader(train_examples, shuffle=True, batch_size=self.batch_size)
         dev_dataloader = torch.utils.data.DataLoader(dev_examples, shuffle=False, batch_size=self.batch_size)
         distill_loss = DistilLoss(self.model
                                         , sentence_embedding_dimension=self.model.get_sentence_embedding_dimension()
-                                        , num_labels=self.n_features
-                                        , feature_dim=self.feature_dims[0] # FIX
-                                        , bias_inits=None)
+                                        , feature_dims=self.feature_dims
+                                        , bias_inits=None
+                                        , sim_fct = self.sim_fct)
         teacher_loss = MultipleConsistencyLoss(self.model, self.control)
 
         # init evaluator
@@ -76,12 +77,10 @@ class PartitionedSentenceTransformer():
         total_features = sum(self.feature_dims)
 
         # global sbert sims
-        simsglobal = cosine_sim(xsent_encoded, ysent_encoded)
-        simsresidual = cosine_sim(xsent_encoded[:,total_features:], ysent_encoded[:,total_features:])
+        sims_global = cosine_sim(xsent_encoded, ysent_encoded)
+        sims_residual = cosine_sim(xsent_encoded[:,total_features:], ysent_encoded[:,total_features:])
 
         metric_features = []
-        #for i in range(0, dim*n, dim):
-        #    metric_features.append((xsent_encoded[:,i:i+dim], ysent_encoded[:,i:i+dim]))
         curr = 0
         for dim in self.feature_dims:
             metric_features.append((xsent_encoded[:,curr:curr+dim], ysent_encoded[:,curr:curr+dim]))
@@ -97,14 +96,14 @@ class PartitionedSentenceTransformer():
         metric_sims = np.array(metric_sims)# * biases[:,np.newaxis]
         metric_sims = metric_sims.T
 
-        preds = np.concatenate((simsglobal[:,np.newaxis], metric_sims, simsresidual[:,np.newaxis]), axis=1)
-        verbose = []
+        preds = np.concatenate((sims_global[:,np.newaxis], metric_sims, sims_residual[:,np.newaxis]), axis=1)
+        verbose_explanation = []
         features = ["global"] + self.feature_names + ["residual"]
         for i, x in enumerate(xsent):
             sims = preds[i]
-            jl = dict(zip(features, sims))
-            jl["sent_a"] = x
-            jl["sent_b"] = ysent[i]
-            verbose.append(jl)
-        return verbose
+            explain_as_dict = dict(zip(features, sims))
+            explain_as_dict["sent_a"] = x
+            explain_as_dict["sent_b"] = ysent[i]
+            verbose_explanation.append(explain_as_dict)
+        return verbose_explanation
 
