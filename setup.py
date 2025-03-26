@@ -16,9 +16,10 @@ setup(
     packages=['xplain', 'xplain.spaceshaping', 'xplain.attribution', 'xplain.symbolic'],
     long_description=long_description,
     long_description_content_type='text/markdown',
-    python_requires=">=3.10",
+    python_requires=">=3.8",
     install_requires=["torch", 
                       "transformers", 
+                      "transformers[torch]", 
                       "sentence-transformers", 
                       "datasets"], #, #"amrlib", #"smatchpp", #"pyemd"]
     classifiers=["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"])
