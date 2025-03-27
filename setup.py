@@ -6,11 +6,11 @@ this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 
 setup(
-    name='xplain',
-    version='0.0.1',    
+    name='xplainsim',
+    version='0.0.2',    
     description='A Python package for explaining text similarity',
     url='https://github.com/flipz357/ExplainSimilarity',
-    author='Juri Opitz',
+    author='Juri Opitz, Andrianos Michail, Lucas Moeller',
     author_email='opitz.sci@gmail.com',
     license='GPLv3',
     packages=['xplain', 'xplain.spaceshaping', 'xplain.attribution', 'xplain.symbolic'],
@@ -21,5 +21,5 @@ setup(
                       "transformers", 
                       "transformers[torch]", 
                       "sentence-transformers", 
-                      "datasets"], #, #"amrlib", #"smatchpp", #"pyemd"]
+                      "datasets"], 
     classifiers=["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"])
