@@ -7,7 +7,7 @@ A package for explaining and exploring semantic similarity through the eyes of t
 
 - [Installation](#requirements)
 - [**Attributions**](#attribution)
-- [**Space Shaping**](#space-shaping)
+- [**SpaceShaping**](#space-shaping)
     - [Idea](#space-shaping-idea)
     - [Toy Example](#space-shaping-toy)
 - [**Symbolic**](#symbolic)
