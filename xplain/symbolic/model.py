@@ -89,4 +89,4 @@ class AMRSimilarity():
                     result[graph_type]["subgraph1"] = g1s
                     result[graph_type]["subgraph2"] = g2s
             explanations.append(result)
-        return result
+        return explanations
