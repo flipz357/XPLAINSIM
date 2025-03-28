@@ -1,4 +1,6 @@
-# Explaining Similarity
+LJK
+ 
+ # Explaining Similarity
 
 A package for explaining and exploring semantic similarity through the eyes of text embedding models.
 
@@ -35,7 +37,7 @@ A, tokens_a, tokens_b = model.postprocess_attributions(A, tokens_a, tokens_b, sp
 # Last line is optional, postprocess attributions to discretize and/or merge subtokens into original tokens.
 ```
 
-## Space partitioning<a id="space-shaping"></a>
+## SpaceShaping<a id="space-shaping"></a>
 
 ### Idea<a id="space-shaping-idea"></a>
 
