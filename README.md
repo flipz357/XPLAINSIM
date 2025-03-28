@@ -1,5 +1,3 @@
-LJK
- 
  # Explaining Similarity
 
 A package for explaining and exploring semantic similarity through the eyes of text embedding models.
