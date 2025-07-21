@@ -93,11 +93,22 @@ class PartitionedSentenceTransformer():
 
     def encode(self, sents):
         return self.model.encode(sents)
-
+    
+    def encode_features(self, sents):
+        encoded = self.encode(sents)
+        features = {}
+        curr = 0
+        for i, fea_name in enumerate(self.feature_names):
+            dim = self.feature_dims[i]
+            features[fea_name] = encoded[:, curr:curr+dim]
+            curr += dim
+        features["residual"] = encoded[:, curr:]
+        return features
+    
     def explain_similarity(self, xsent, ysent):
-        xsent_encoded = self.encode(xsent)
-        ysent_encoded = self.encode(ysent)
-
+        feax = self.encode_features(xsent)
+        feay = self.encode_features(ysent)
+        
         # cosine helper function
         def cosine_sim(mat1, mat2):
             prod = mat1 * mat2
@@ -105,36 +116,23 @@ class PartitionedSentenceTransformer():
             normx, normy = normf(mat1), normf(mat2)
             return np.sum(prod, axis=1) / (normx * normy)
         
-        total_features = sum(self.feature_dims)
-
-        # global sbert sims
-        sims_global = cosine_sim(xsent_encoded, ysent_encoded)
-        sims_residual = cosine_sim(xsent_encoded[:,total_features:], ysent_encoded[:,total_features:])
-
-        metric_features = []
-        curr = 0
-        for dim in self.feature_dims:
-            metric_features.append((xsent_encoded[:,curr:curr+dim], ysent_encoded[:,curr:curr+dim]))
-            curr += dim
-
-        metric_sims = []
-        for i in range(len(self.feature_names)):
-            xfea = metric_features[i][0]
-            yfea = metric_features[i][1]
-            simfea = cosine_sim(xfea, yfea)
-            metric_sims.append(simfea)
-
-        metric_sims = np.array(metric_sims)# * biases[:,np.newaxis]
-        metric_sims = metric_sims.T
-
-        preds = np.concatenate((sims_global[:,np.newaxis], metric_sims, sims_residual[:,np.newaxis]), axis=1)
-        verbose_explanation = []
-        features = ["global"] + self.feature_names + ["residual"]
-        for i, x in enumerate(xsent):
-            sims = preds[i]
-            explain_as_dict = dict(zip(features, sims))
-            explain_as_dict["sent_a"] = x
-            explain_as_dict["sent_b"] = ysent[i]
-            verbose_explanation.append(explain_as_dict)
-        return verbose_explanation
+        data = {}
+        for fea_name in self.feature_names:
+            x = feax[fea_name]
+            y = feay[fea_name]
+            data[fea_name] = cosine_sim(x, y)
+        
+        xglob = np.concatenate([feax[fn] for fn in self.feature_names + ["residual"]], axis=1)
+        yglob = np.concatenate([feay[fn] for fn in self.feature_names + ["residual"]], axis=1)
+        data["global"] = cosine_sim(xglob, yglob)
+        explanations = []
+        for i, sx in enumerate(xsent):
+            sy = ysent[i]
+            explanation = {}
+            explanation["sent_a"] = sx
+            explanation["sent_b"] = sy
+            for fea_name in self.feature_names + ["global"]:
+                explanation[fea_name] = data[fea_name][i]
+            explanations.append(explanation)
+        return explanations
 

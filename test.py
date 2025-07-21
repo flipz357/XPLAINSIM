@@ -54,10 +54,12 @@ def test_space_shaping_direct():
     ]
     
     json = pt.explain_similarity(sents, sents_other)
+    print(json)
     print(pearsonr([x.label[0] for x in some_examples], [dic["len_words"] for dic in json]))
     print(pearsonr([x.label[1] for x in some_examples], [dic["len_chars"] for dic in json]))
     pt.train_direct(some_examples, some_examples)
     json = pt.explain_similarity(sents, sents_other)
+    print(json)
     print(pearsonr([x.label[0] for x in some_examples], [dic["len_words"] for dic in json]))
     print(pearsonr([x.label[1] for x in some_examples], [dic["len_chars"] for dic in json]))
 
