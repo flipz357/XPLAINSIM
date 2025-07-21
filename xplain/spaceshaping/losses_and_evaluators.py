@@ -209,7 +209,7 @@ class MultipleConsistencyLossPaired(nn.Module):
 
 class MultipleConsistencyLossDirect(nn.Module):
     """
-        This loss expects as input a batch consisting of sentence pairs (a_1, p_1), (a_2, p_2)..., (a_n, p_n)
+        This loss expects as input a batch consisting of sentences [s1, s2,...]
         a learner and a teacher model. The loss computes a pairwise similarity matrix on the embeddings from the
         learner model A and for the teacher model B and tunes the Mean squared error (A - B)^2. I.e.,
         the learner is tuned to be consistend with the teacher.
