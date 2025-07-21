@@ -27,12 +27,39 @@ def test_space_shaping():
         for (i, (x1, x2)) in enumerate(some_pairs)
     ]
     json = pt.explain_similarity([x for x, y in some_pairs], [y for x, y in some_pairs])
-    print(json)
+    #print(json)
     print(pearsonr([x.label[0] for x in some_examples], [dic["bow"] for dic in json]))
     pt.train(some_examples, some_examples)
     json = pt.explain_similarity([x for x, y in some_pairs], [y for x, y in some_pairs])
-    print(json)
+    #print(json)
     print(pearsonr([x.label[0] for x in some_examples], [dic["bow"] for dic in json]))
+
+
+def test_space_shaping_direct():
+    from scipy.stats import pearsonr
+    from xplain.spaceshaping import PartitionedSentenceTransformer
+    from sentence_transformers import InputExample
+
+    pt = PartitionedSentenceTransformer(feature_names=["len_words", "len_chars"], feature_dims=[1, 1])
+    from datasets import load_dataset
+
+    ds = load_dataset("mteb/stsbenchmark-sts")
+    sents = [dic["sentence1"] for dic in ds["train"]]
+    sents_other = list(reversed(sents))
+
+    target = [[float(len(x.split()))/25, float(len(x))/100] for x in sents]
+    some_examples = [
+        InputExample(texts=[x], label=target[i])
+        for (i, x) in enumerate(sents)
+    ]
+    
+    json = pt.explain_similarity(sents, sents_other)
+    print(pearsonr([x.label[0] for x in some_examples], [dic["len_words"] for dic in json]))
+    print(pearsonr([x.label[1] for x in some_examples], [dic["len_chars"] for dic in json]))
+    pt.train_direct(some_examples, some_examples)
+    json = pt.explain_similarity(sents, sents_other)
+    print(pearsonr([x.label[0] for x in some_examples], [dic["len_words"] for dic in json]))
+    print(pearsonr([x.label[1] for x in some_examples], [dic["len_chars"] for dic in json]))
 
 
 def test_attribution():
@@ -179,7 +206,8 @@ def test_symbolic():
     exp = explainer.explain_similarity(sents1, sents2, return_graphs=True)
     print(exp)
 
-test_all_attribution_models_compile()
+#test_all_attribution_models_compile()
 # test_attribution()
-# test_space_shaping()
+#test_space_shaping()
+test_space_shaping_direct()
 # test_symbolic()

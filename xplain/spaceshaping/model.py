@@ -2,14 +2,14 @@ import torch
 from sentence_transformers import SentenceTransformer
 import logging
 import numpy as np
-from xplain.spaceshaping.losses_and_evaluators import DistilLoss, MultipleConsistencyLoss, DistilConsistencyEvaluator
+from xplain.spaceshaping.losses_and_evaluators import DistilLossMetric, DistilLossDirect, MultipleConsistencyLossPaired, MultipleConsistencyLossDirect, DistilConsistencyEvaluator
 from xplain.spaceshaping import util
 
 logger = logging.getLogger(__name__)
 
 class PartitionedSentenceTransformer():
 
-    def __init__(self,  feature_names: list, feature_dims:list, base_model_uri="all-MiniLM-L12-v2", 
+    def __init__(self,  feature_names: list, feature_dims: list, base_model_uri="all-MiniLM-L12-v2", 
                  device="cpu", tune_n_layers=2, batch_size=32, learning_rate=0.001,
                  epochs=2, warmup_steps=1000, eval_steps=200, save_path=None, write_csv=None, sim_fct=util.co_sim):
         
@@ -37,15 +37,43 @@ class PartitionedSentenceTransformer():
         util.freeze_all_layers(self.control)
 
     def train(self, train_examples, dev_examples):
-        
+         
         train_dataloader = torch.utils.data.DataLoader(train_examples, shuffle=True, batch_size=self.batch_size)
         dev_dataloader = torch.utils.data.DataLoader(dev_examples, shuffle=False, batch_size=self.batch_size)
-        distill_loss = DistilLoss(self.model
+        distill_loss = DistilLossMetric(self.model
                                         , sentence_embedding_dimension=self.model.get_sentence_embedding_dimension()
                                         , feature_dims=self.feature_dims
                                         , bias_inits=None
                                         , sim_fct = self.sim_fct)
-        teacher_loss = MultipleConsistencyLoss(self.model, self.control)
+        teacher_loss = MultipleConsistencyLossPaired(self.model, self.control)
+
+        # init evaluator
+        evaluator = DistilConsistencyEvaluator(dev_dataloader
+                                                , loss_model_distil=distill_loss
+                                                , loss_model_consistency=teacher_loss
+                                                , write_csv = self.write_csv)
+
+        #Tune the model
+        self.model.fit(train_objectives=[(train_dataloader, teacher_loss), (train_dataloader, distill_loss)]
+                                    , optimizer_params={'lr': self.learning_rate}
+                                    , epochs=self.epochs
+                                    , warmup_steps=self.warmup_steps
+                                    , evaluator=evaluator
+                                    , evaluation_steps=self.eval_steps
+                                    , output_path=self.save_path
+                                    , save_best_model=False)
+    
+    def train_direct(self, train_examples, dev_examples):
+        assert [x == 1 for x in self.feature_dims]
+
+        train_dataloader = torch.utils.data.DataLoader(train_examples, shuffle=True, batch_size=self.batch_size)
+        dev_dataloader = torch.utils.data.DataLoader(dev_examples, shuffle=False, batch_size=self.batch_size)
+        distill_loss = DistilLossDirect(self.model
+                                        , sentence_embedding_dimension=self.model.get_sentence_embedding_dimension()
+                                        , feature_dims=self.feature_dims
+                                        , bias_inits=None)
+
+        teacher_loss = MultipleConsistencyLossDirect(self.model, self.control)
 
         # init evaluator
         evaluator = DistilConsistencyEvaluator(dev_dataloader
@@ -63,9 +91,12 @@ class PartitionedSentenceTransformer():
                                     , output_path=self.save_path
                                     , save_best_model=False)
 
+    def encode(self, sents):
+        return self.model.encode(sents)
+
     def explain_similarity(self, xsent, ysent):
-        xsent_encoded = self.model.encode(xsent)
-        ysent_encoded = self.model.encode(ysent)
+        xsent_encoded = self.encode(xsent)
+        ysent_encoded = self.encode(ysent)
 
         # cosine helper function
         def cosine_sim(mat1, mat2):
