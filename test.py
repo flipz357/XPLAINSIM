@@ -2,11 +2,11 @@ def test_space_shaping():
     from scipy.stats import pearsonr
     from xplain.spaceshaping import PartitionedSentenceTransformer
     from sentence_transformers import InputExample
-
-    pt = PartitionedSentenceTransformer(feature_names=["bow"], feature_dims=[100])
     from datasets import load_dataset
 
     ds = load_dataset("mteb/stsbenchmark-sts")
+    
+    # need a dataset with losely related pairs (we use STS but we do not use any gold annotations from this!)
     some_pairs = list(
         zip(
             [dic["sentence1"] for dic in ds["train"]],
@@ -20,48 +20,60 @@ def test_space_shaping():
         inter = x1.intersection(x2)
         union = x1.union(x2)
         return len(inter) / len(union)
-
+    
+    # we infer some metric features, here the trivial structural bag of words overlap
     target = [[bow_sim(x1, x2)] for x1, x2 in some_pairs]
     some_examples = [
         InputExample(texts=[x1, x2], label=target[i])
         for (i, (x1, x2)) in enumerate(some_pairs)
     ]
+    pt = PartitionedSentenceTransformer(feature_names=["bow"], feature_dims=[100])
     json = pt.explain_similarity([x for x, y in some_pairs], [y for x, y in some_pairs])
-    #print(json)
+    print("correlation before training")
     print(pearsonr([x.label[0] for x in some_examples], [dic["bow"] for dic in json]))
+    print("explanations for the first ten examples")
+    print(json[:10])
     pt.train(some_examples, some_examples)
     json = pt.explain_similarity([x for x, y in some_pairs], [y for x, y in some_pairs])
-    #print(json)
+    print("correlation after training")
     print(pearsonr([x.label[0] for x in some_examples], [dic["bow"] for dic in json]))
+    print("explanations for the first ten examples")
+    print(json[:10])
 
 
 def test_space_shaping_direct():
     from scipy.stats import pearsonr
     from xplain.spaceshaping import PartitionedSentenceTransformer
     from sentence_transformers import InputExample
-
-    pt = PartitionedSentenceTransformer(feature_names=["len_words", "len_chars"], feature_dims=[1, 1])
     from datasets import load_dataset
 
     ds = load_dataset("mteb/stsbenchmark-sts")
+    
+    # This time, no paired sentences are required!
     sents = [dic["sentence1"] for dic in ds["train"]]
     sents_other = list(reversed(sents))
-
+    
+    # We infer sentence level features, here two trivial length features
     target = [[float(len(x.split()))/25, float(len(x))/100] for x in sents]
     some_examples = [
         InputExample(texts=[x], label=target[i])
         for (i, x) in enumerate(sents)
     ]
-    
+
+    pt = PartitionedSentenceTransformer(feature_names=["len_words", "len_chars"], feature_dims=[1, 1])
     json = pt.explain_similarity(sents, sents_other)
-    print(json)
+    print("correlation before training")
     print(pearsonr([x.label[0] for x in some_examples], [dic["len_words"] for dic in json]))
     print(pearsonr([x.label[1] for x in some_examples], [dic["len_chars"] for dic in json]))
+    print("explanations for the first ten examples")
+    print(json[:10])
     pt.train_direct(some_examples, some_examples)
     json = pt.explain_similarity(sents, sents_other)
-    print(json)
+    print("correlation after training")
     print(pearsonr([x.label[0] for x in some_examples], [dic["len_words"] for dic in json]))
     print(pearsonr([x.label[1] for x in some_examples], [dic["len_chars"] for dic in json]))
+    print("explanations for the first ten examples")
+    print(json[:10])
 
 
 def test_attribution():
@@ -210,6 +222,6 @@ def test_symbolic():
 
 #test_all_attribution_models_compile()
 # test_attribution()
-#test_space_shaping()
-test_space_shaping_direct()
+test_space_shaping()
+#test_space_shaping_direct()
 # test_symbolic()
