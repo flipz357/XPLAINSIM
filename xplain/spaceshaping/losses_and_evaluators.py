@@ -139,7 +139,7 @@ class DistilLossDirect(nn.Module):
     
 
     def forward(self, sentence_features: Iterable[Dict[str, Tensor]], labels: Tensor):
-        """Compute the partitnioning loss sim(sub_embeddings) vs target metrics"""
+        """Compute the partitioning loss on single dimensions with direct target"""
 
         reps = [self.model(sentence_feature)['sentence_embedding'] for sentence_feature in sentence_features]
         rep_a = reps[0]
