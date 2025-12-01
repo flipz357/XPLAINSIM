@@ -1,12 +1,18 @@
- # Explaining Similarity
+ # XPLAINSIM: An Explainability Toolkit for Text Similarity
 
-A package for explaining and exploring semantic similarity through the eyes of text embedding models.
+Explaining text similarity and developing interpretable models are emergent research challenges with little to none available tooling.
+
+
+We release **XPLAINSIM**, the **FIRST** Python package that makes three different approaches for explaining textual similarity widely accesible.
 
 ## Overview of Repository / Table of Contents
 
 
 - [Installation](#requirements)
 - [**Attributions**](#attribution)
+	- [Example Code](#attributions-example)
+	- [Expansion: Subtokens-to-Tokens](#attributions-subtokens-to-tokens)  
+	- [Expansion: Cross-Linguality](#attributions-cross-linguality)
 - [**SpaceShaping**](#space-shaping)
     - [Idea](#space-shaping-idea)
     - [Toy Example](#space-shaping-toy)
@@ -22,7 +28,9 @@ To install our package you can install using:
 ```
 pip install xplainsim
 ```
-## To obtain attributions for an off-the-shelf transformer<a id="attribution"></a>
+## Attributions <a id="attribution"></a>
+
+### Example Code<a id="attributions-example"></a>
 
 ```python
 from xplain.attribution import ModelFactory
@@ -31,8 +39,22 @@ model = ModelFactory.build("huggingface_id") # e.g sentence-transformers/all-mpn
 texta = 'The dog runs after the kitten in the yard.'
 textb = 'Outside in the garden the cat is chased by the dog.'
 A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
+```
+
+### Expansion: Subtokens-to-Tokens<a id="attributions-subtokens-to-tokens"></a>
+```python
+# same as above, then
 A, tokens_a, tokens_b = model.postprocess_attributions(A, tokens_a, tokens_b, sparsification_method="FlowAlign")
-# Last line is optional, postprocess attributions to discretize and/or merge subtokens into original tokens.
+```
+
+### Expansion: Cross-Linguality <a id="attributions-cross-linguality"></a>
+```python
+from xplain.attribution import ModelFactory
+print(ModelFactory.show_options()) # shows available model names, use in build below
+model = ModelFactory.build("huggingface_id") # a multilingual model, e.g Alibaba-NLP/gte-multilingual-base
+texta = 'The dog runs after the kitten in the yard.'
+textb = 'Im Garten rennt der Hund der Katze hinterher.'
+A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
 ```
 
 ## SpaceShaping<a id="space-shaping"></a>
