@@ -15,7 +15,7 @@ We release **XPLAINSIM**, the **FIRST** Python package that makes three differen
 	- [Expansion: Cross-Linguality](#attributions-cross-linguality)
 - [**SpaceShaping**](#space-shaping)
     - [Idea](#space-shaping-idea)
-    - [Toy Example](#space-shaping-toy)
+    - [Example](#space-shaping-example)
 - [**Symbolic**](#symbolic)
     - [AMR parsing and multi-subgraph metric](#amr)
 - [FAQ](#faq)
@@ -84,7 +84,7 @@ pt = PartitionedSentenceTransformer(feature_names=[metric.name for metric in my_
 pt.train(examples)
 ```
 
-### Space Paritioning Example<a id="space-shaping-toy"></a>
+### Space Paritioning Example<a id="space-shaping-example"></a>
 
 Here's a very simple example for training and inferring with a custom model.
 
