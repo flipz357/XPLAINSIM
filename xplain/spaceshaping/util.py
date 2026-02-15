@@ -2,6 +2,13 @@ from torch import Tensor
 import torch
 import torch.nn.functional as F
 
+from sentence_transformers import util
+
+SIMILARITY_REGISTRY = {
+    "cosine": lambda a, b: torch.nn.functional.cosine_similarity(a, b, dim=1),
+    "dot": lambda a, b: torch.sum(a * b, dim=1),
+}
+
 def freeze_all_layers(model):
     for name, param in model.named_parameters():
         param.requires_grad = False
@@ -62,3 +69,4 @@ def co_sim(reps1: Tensor, reps2: Tensor):
     reps2_norm = torch.sqrt(reps2_norm)
     sim /= (reps1_norm * reps2_norm)
     return sim
+

@@ -1,138 +1,189 @@
 import torch
-from sentence_transformers import SentenceTransformer
-import logging
 import numpy as np
-from xplain.spaceshaping.losses_and_evaluators import DistilLossMetric, DistilLossDirect, MultipleConsistencyLossPaired, MultipleConsistencyLossDirect, DistilConsistencyEvaluator
+import logging
+from typing import List, Dict
+
+from sentence_transformers import SentenceTransformer
+from xplain.spaceshaping.losses_and_evaluators import (
+        PartitionLoss, 
+        ConsistencyLoss, 
+        MultiLossEvaluator
+        )
 from xplain.spaceshaping import util
 
 logger = logging.getLogger(__name__)
 
-class PartitionedSentenceTransformer():
+class PartitionedSentenceTransformer(SentenceTransformer):
 
-    def __init__(self,  feature_names: list, feature_dims: list, base_model_uri="all-MiniLM-L12-v2", 
-                 device="cpu", tune_n_layers=2, batch_size=32, learning_rate=0.001,
-                 epochs=2, warmup_steps=1000, eval_steps=200, save_path=None, write_csv=None, sim_fct=util.co_sim):
+    def __init__(self,  feature_names: list[str], feature_dims: list[int], 
+            base_model_uri: str = "all-MiniLM-L12-v2", 
+            device: str = "cpu", tune_n_layers: str = 2):
         
+        super().__init__(base_model_uri, device=device)
+
         assert len(feature_names) == len(feature_dims)
-        self.base_model_uri = base_model_uri
+        assert sum(feature_dims) <= self.get_sentence_embedding_dimension()
+
         self.feature_names = feature_names
-        self.n_features = len(feature_names)
         self.feature_dims = feature_dims
-        self.device = device
-        self.tune_n_layers = tune_n_layers
-        self.batch_size = batch_size
-        self.learning_rate = learning_rate
-        self.epochs = epochs
-        self.warmup_steps = warmup_steps
-        self.eval_steps = eval_steps
-        self.save_path = save_path
-        self.write_csv = write_csv
-        self.sim_fct = sim_fct
-        self.init_models()
+        self.n_features = len(feature_names)
 
-    def init_models(self):
-        self.model = SentenceTransformer(self.base_model_uri, device=self.device)
-        self.control = SentenceTransformer(self.base_model_uri, device=self.device)
-        util.freeze_except_last_layers(self.model, self.tune_n_layers)
-        util.freeze_all_layers(self.control)
+        util.freeze_except_last_layers(self, tune_n_layers)
 
-    def train(self, train_examples, dev_examples):
-         
-        train_dataloader = torch.utils.data.DataLoader(train_examples, shuffle=True, batch_size=self.batch_size)
-        dev_dataloader = torch.utils.data.DataLoader(dev_examples, shuffle=False, batch_size=self.batch_size)
-        distill_loss = DistilLossMetric(self.model
-                                        , sentence_embedding_dimension=self.model.get_sentence_embedding_dimension()
-                                        , feature_dims=self.feature_dims
-                                        , bias_inits=None
-                                        , sim_fct = self.sim_fct)
-        teacher_loss = MultipleConsistencyLossPaired(self.model, self.control)
+    # ------------------------------------------------------------------
+    # Loss Construction
+    # ------------------------------------------------------------------
 
-        # init evaluator
-        evaluator = DistilConsistencyEvaluator(dev_dataloader
-                                                , loss_model_distil=distill_loss
-                                                , loss_model_consistency=teacher_loss
-                                                , write_csv = self.write_csv)
+    def _build_control_model(self):
+        """Create frozen teacher model."""
+        control = SentenceTransformer(
+            self._first_module().auto_model.name_or_path,
+            device=self.device,
+        )
+        util.freeze_all_layers(control)
+        return control
 
-        #Tune the model
-        self.model.fit(train_objectives=[(train_dataloader, teacher_loss), (train_dataloader, distill_loss)]
-                                    , optimizer_params={'lr': self.learning_rate}
-                                    , epochs=self.epochs
-                                    , warmup_steps=self.warmup_steps
-                                    , evaluator=evaluator
-                                    , evaluation_steps=self.eval_steps
-                                    , output_path=self.save_path
-                                    , save_best_model=False)
-    
-    def train_direct(self, train_examples, dev_examples):
-        assert [x == 1 for x in self.feature_dims]
+    def _build_losses(self, use_consistency: bool = True) -> Dict[str, torch.nn.Module]:
+        """
+        Build training losses.
+        """
 
-        train_dataloader = torch.utils.data.DataLoader(train_examples, shuffle=True, batch_size=self.batch_size)
-        dev_dataloader = torch.utils.data.DataLoader(dev_examples, shuffle=False, batch_size=self.batch_size)
-        distill_loss = DistilLossDirect(self.model
-                                        , sentence_embedding_dimension=self.model.get_sentence_embedding_dimension()
-                                        , feature_dims=self.feature_dims
-                                        , bias_inits=None)
+        losses = {}
 
-        teacher_loss = MultipleConsistencyLossDirect(self.model, self.control)
+        # Structured partition loss
+        losses["partition"] = PartitionLoss(
+            model=self,
+            mode="metric",
+            feature_dims=self.feature_dims,
+            similarity="cosine",
+        )
 
-        # init evaluator
-        evaluator = DistilConsistencyEvaluator(dev_dataloader
-                                                , loss_model_distil=distill_loss
-                                                , loss_model_consistency=teacher_loss
-                                                , write_csv = self.write_csv)
+        # Optional teacher consistency
+        if use_consistency:
+            teacher = self._build_control_model()
+            losses["consistency"] = ConsistencyLoss(
+                model=self,
+                teacher=teacher,
+                mode="batch",
+                similarity="cosine",
+            )
 
-        #Tune the model
-        self.model.fit(train_objectives=[(train_dataloader, teacher_loss), (train_dataloader, distill_loss)]
-                                    , optimizer_params={'lr': self.learning_rate}
-                                    , epochs=self.epochs
-                                    , warmup_steps=self.warmup_steps
-                                    , evaluator=evaluator
-                                    , evaluation_steps=self.eval_steps
-                                    , output_path=self.save_path
-                                    , save_best_model=False)
+        return losses
 
-    def encode(self, sents):
-        return self.model.encode(sents)
-    
-    def encode_features(self, sents):
-        encoded = self.encode(sents)
+    # ------------------------------------------------------------------
+    # Training
+    # ------------------------------------------------------------------
+
+    def train_model(
+        self,
+        train_examples,
+        dev_examples,
+        batch_size: int = 32,
+        lr: float = 1e-3,
+        epochs: int = 1,
+        warmup_steps: int = 1000,
+        eval_steps: int = 200,
+        save_path: str = None,
+        write_csv: bool = True,
+        use_consistency: bool = True,
+    ):
+        """
+        Train the partitioned model.
+        """
+
+        train_dl = torch.utils.data.DataLoader(
+            train_examples,
+            shuffle=True,
+            batch_size=batch_size,
+        )
+
+        dev_dl = torch.utils.data.DataLoader(
+            dev_examples,
+            shuffle=False,
+            batch_size=batch_size,
+        )
+
+        losses = self._build_losses(use_consistency=use_consistency)
+
+        evaluator = MultiLossEvaluator(
+            dataloader=dev_dl,
+            losses=losses,
+            write_csv=write_csv,
+        )
+
+        self.fit(
+            train_objectives=[(train_dl, loss) for loss in losses.values()],
+            optimizer_params={"lr": lr},
+            epochs=epochs,
+            warmup_steps=warmup_steps,
+            evaluator=evaluator,
+            evaluation_steps=eval_steps,
+            output_path=save_path,
+            save_best_model=False,
+        )
+
+    # ------------------------------------------------------------------
+    # Embedding Partition Utilities
+    # ------------------------------------------------------------------
+
+    def split_embedding(self, embeddings: np.ndarray, include_residual: bool = True) -> Dict[str, np.ndarray]:
+        """
+        Split embeddings into feature subspaces + residual.
+        """
+
         features = {}
-        curr = 0
-        for i, fea_name in enumerate(self.feature_names):
-            dim = self.feature_dims[i]
-            features[fea_name] = encoded[:, curr:curr+dim]
-            curr += dim
-        features["residual"] = encoded[:, curr:]
-        return features
-    
-    def explain_similarity(self, xsent, ysent):
-        feax = self.encode_features(xsent)
-        feay = self.encode_features(ysent)
-        
-        # cosine helper function
-        def cosine_sim(mat1, mat2):
-            prod = mat1 * mat2
-            normf = lambda x: np.sqrt(np.sum(x**2, axis=1))
-            normx, normy = normf(mat1), normf(mat2)
-            return np.sum(prod, axis=1) / (normx * normy)
-        
-        data = {}
-        for fea_name in self.feature_names:
-            x = feax[fea_name]
-            y = feay[fea_name]
-            data[fea_name] = cosine_sim(x, y)
-        
-        xglob = np.concatenate([feax[fn] for fn in self.feature_names + ["residual"]], axis=1)
-        yglob = np.concatenate([feay[fn] for fn in self.feature_names + ["residual"]], axis=1)
-        data["global"] = cosine_sim(xglob, yglob)
-        explanations = []
-        for i, sx in enumerate(xsent):
-            sy = ysent[i]
-            explanation = {}
-            explanation["sent_a"] = sx
-            explanation["sent_b"] = sy
-            for fea_name in self.feature_names + ["global"]:
-                explanation[fea_name] = data[fea_name][i]
-            explanations.append(explanation)
-        return explanations
+        start = 0
 
+        for name, dim in zip(self.feature_names, self.feature_dims):
+            stop = start + dim
+            features[name] = embeddings[:, start:stop]
+            start = stop
+        if include_residual:
+            features["residual"] = embeddings[:, start:]
+        return features
+
+    # ------------------------------------------------------------------
+    # Explainability
+    # ------------------------------------------------------------------
+
+    def explain_similarity(self, sent_a: List[str], sent_b: List[str]):
+        """
+        Return feature-wise similarity explanations.
+        """
+
+        emb_a = self.encode(sent_a)
+        emb_b = self.encode(sent_b)
+
+        parts_a = self.split_embedding(emb_a)
+        parts_b = self.split_embedding(emb_b)
+
+        def cosine_sim(x, y):
+            return np.sum(x * y, axis=1) / (
+                np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
+            )
+
+        explanations = []
+
+        for i in range(len(sent_a)):
+
+            explanation = {
+                "sent_a": sent_a[i],
+                "sent_b": sent_b[i],
+            }
+
+            # Feature-level similarities
+            for name in self.feature_names:
+                explanation[name] = cosine_sim(
+                    parts_a[name][i:i+1],
+                    parts_b[name][i:i+1],
+                )[0]
+
+            # Global similarity
+            explanation["global"] = cosine_sim(
+                emb_a[i:i+1],
+                emb_b[i:i+1],
+            )[0]
+
+            explanations.append(explanation)
+
+        return explanations

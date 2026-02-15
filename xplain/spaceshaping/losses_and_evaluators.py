@@ -1,6 +1,6 @@
 import torch
 from torch import nn, Tensor
-from typing import Iterable, Dict, Callable
+from typing import Iterable, Dict, List, Callable, Optional
 
 from sentence_transformers import SentenceTransformer
 from sentence_transformers import util as stutil
@@ -15,248 +15,236 @@ import csv
 logger = logging.getLogger(__name__)
 
 
-class DistilLossMetric(nn.Module):
+class PartitionLoss(nn.Module):
     """
-    Parameter-free loss module to distill metrics, decompose output space
+    Loss to decompose output space
 
-    :param model: SentenceTransformer model
-    :param sentence_embedding_dimension: Dimension of your sentence embeddings
-    :param feature_dim: Dimension of a feature
-    :param loss_fct: Optional: Custom pytorch loss function. If not set, uses nn.MSELoss()
-    :param sim_fct: Optional: Custom similarity function. If not set, uses Cosine Sim
-     Example::
-        from sentence_transformers import SentenceTransformer, SentencesDataset, losses
-        from sentence_transformers.readers import InputExample
-        model = SentenceTransformer('distilbert-base-nli-mean-tokens')
-        train_examples = [InputExample(texts=['First pair, sent A', 'First pair, sent B'], label=[0.3, 0.2, 0.9]),
-            InputExample(texts=['Second Pair, sent A', 'Second Pair, sent B'], label=[0.4, 0.1, 0.2])]
-        train_dataset = SentencesDataset(train_examples, model)
-        train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=train_batch_size)
-        train_loss = losses.DistilLoss(model=model, sentence_embedding_dimension=model.get_sentence_embedding_dimension(), feature_dims=[16, 24, 16])
+    mode:
+        - "metric": similarity between embedding partitions
+        - "direct": direct regression on full embedding
+    model: SentenceTransformer model
+    feature_dim: Optional Dimension of a feature, if None then 1
+    loss_fct: Optional Custom pytorch loss function. If not set, uses nn.MSELoss()
+    sim_fct: Optional: Custom similarity function. If not set, uses Cosine Sim
     """
     def __init__(self,
                  model: SentenceTransformer,
-                 sentence_embedding_dimension: int,
-                 feature_dims: list[int],
-                 bias_inits: np.array = None,
+                 mode: str,
+                 feature_dims: Optional[List[int]] = None,
+                 similarity: str = "cosine",
                  loss_fct: Callable = nn.MSELoss(),
-                 sim_fct: Callable = util.co_sim): #dist_sim
-        super(DistilLossMetric, self).__init__()
-        self.model = model
-        self.sentence_embedding_dimension = sentence_embedding_dimension
-
-        self.loss_fct = loss_fct
-        self.sim_fct = sim_fct
-        self.feature_dims = feature_dims
-        self.num_labels = len(feature_dims)
-
-        if bias_inits is None:
-            biases = torch.ones(self.num_labels, requires_grad=False)
-            self.score_bias = nn.Parameter(biases)
-        else:
-            biases = torch.tensor(bias_inits, requires_grad=True, dtype=torch.float32)
-            self.score_bias = nn.Parameter(biases)
-
-        self.score_bias.to(model._target_device)
-    
-
-    def forward(self, sentence_features: Iterable[Dict[str, Tensor]], labels: Tensor):
-        """Compute the partitnioning loss sim(sub_embeddings) vs target metrics"""
-
-        reps = [self.model(sentence_feature)['sentence_embedding'] for sentence_feature in sentence_features]
-        rep_a, rep_b = reps
+                 use_bias: bool = False):
         
-        sims = []
+        super().__init__()
+
+        assert mode in ["metric", "direct"]
+        assert similarity in util.SIMILARITY_REGISTRY
+
+        self.model = model
+        self.mode = mode
+        self.feature_dims = feature_dims
+        self.similarity_name = similarity
+        self.similarity_fct = util.SIMILARITY_REGISTRY[similarity]
+        self.loss_fct = loss_fct
+        self.use_bias = use_bias
+
+        if self.mode == "metric":
+            assert feature_dims is not None
+            self.num_features = len(feature_dims)
+
+            if use_bias:
+                self.score_bias = nn.Parameter(torch.ones(self.num_features))
+            else:
+                self.register_parameter("score_bias", None)
+    
+    """
+    def _partition(self, emb: Tensor):
+        slices = []
         start = 0
-        for i in range(self.num_labels):
-            
-            # get dimensionality of feature
-            feature_dim = self.feature_dims[i]
+        for dim in self.feature_dims:
+            stop = start + dim
+            slices.append(emb[:, start:stop])
+            start = stop
+        return slices
+    """
 
-            # get two subembeddings
-            stop = start + feature_dim
-            rep_ax = rep_a[:, start:stop]
-            rep_bx = rep_b[:, start:stop]
+    def forward(self, sentence_features, labels):
 
-            # and compute their similariy
-            sim = self.sim_fct(rep_ax, rep_bx)
-            sims.append(sim)
-            start += feature_dim
+        reps = [self.model(sentence_feature)["sentence_embedding"] for sentence_feature in sentence_features]
 
-        # sims: (n_features x n_batch)
-        # output: (n_batch x n_features)
-        outputs = torch.stack(sims).T 
-        outputs = self.score_bias * outputs
-        
-        if labels is not None:
-            loss = self.loss_fct(outputs, labels)
-            return loss 
-        return reps, outputs
-    
+        if self.mode == "metric":
+
+            emb_a, emb_b = reps
+
+            parts_a = self.model.split_embedding(emb_a, include_residual=False)
+            parts_b = self.model.split_embedding(emb_b, include_residual=False)
+
+            sims = [self.similarity_fct(parts_a[name], parts_b[name]) for name in self.model.feature_names]
+
+            outputs = torch.stack(sims, dim=1)
+
+            if self.use_bias:
+                outputs = outputs * self.score_bias
+
+            return self.loss_fct(outputs, labels)
+
+        # direct mode
+        emb = reps[0]
+        k = labels.shape[1]
+        return self.loss_fct(emb[:, :k], labels)
+
     def get_config_dict(self):
-        return {'biases': self.score_bias}
+        return {
+            "mode": self.mode,
+            "feature_dims": self.feature_dims,
+            "similarity": self.similarity_name,
+            "loss_fct": self.loss_fct.__class__.__name__,
+            "use_bias": self.use_bias,
+        }
 
 
-class DistilLossDirect(nn.Module):
+class ConsistencyLoss(nn.Module):
     """
-    Parameter-free loss module to distill signle dimensions directly, decompose output space
+        This loss aligns the overall similarities of a learner with thouse of a teacher.
 
-    :param model: SentenceTransformer model
-    :param sentence_embedding_dimension: Dimension of your sentence embeddings
-    :param feature_dim: Dimension of a feature
-    :param loss_fct: Optional: Custom pytorch loss function. If not set, uses nn.MSELoss()
-     Example::
-        from sentence_transformers import SentenceTransformer, SentencesDataset, losses
-        from sentence_transformers.readers import InputExample
-        model = SentenceTransformer('distilbert-base-nli-mean-tokens')
-        train_examples = [InputExample(texts=['sent A', 'sent B'], label=[0.3, 0.2, 0.9])],
-        train_dataset = SentencesDataset(train_examples, model)
-        train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=train_batch_size)
-        train_loss = losses.DistilLossDirect(model=model, sentence_embedding_dimension=model.get_sentence_embedding_dimension(), feature_dims=[1,1,1])
-    """
-    def __init__(self,
-                 model: SentenceTransformer,
-                 sentence_embedding_dimension: int,
-                 feature_dims: list[int],
-                 bias_inits: np.array = None,
-                 loss_fct: Callable = nn.MSELoss()): #dist_sim
-        super(DistilLossDirect, self).__init__()
-        self.model = model
-        self.sentence_embedding_dimension = sentence_embedding_dimension
-
-        self.loss_fct = loss_fct
-        self.feature_dims = feature_dims
-        self.num_labels = len(feature_dims)
-
-        if bias_inits is None:
-            biases = torch.ones(self.num_labels, requires_grad=False)
-            self.score_bias = nn.Parameter(biases)
-        else:
-            biases = torch.tensor(bias_inits, requires_grad=True, dtype=torch.float32)
-            self.score_bias = nn.Parameter(biases)
-
-        self.score_bias.to(model._target_device)
-    
-
-    def forward(self, sentence_features: Iterable[Dict[str, Tensor]], labels: Tensor):
-        """Compute the partitioning loss on single dimensions with direct target"""
-
-        reps = [self.model(sentence_feature)['sentence_embedding'] for sentence_feature in sentence_features]
-        rep_a = reps[0]
-        if labels is not None:
-            loss = self.loss_fct(rep_a[:,0:labels.shape[1]], labels)
-            return loss 
-        return reps, outputs
-    
-    def get_config_dict(self):
-        return {'biases': self.score_bias}
-
-
-class MultipleConsistencyLossPaired(nn.Module):
-    """
-        This loss expects as input a batch consisting of sentence pairs (a_1, p_1), (a_2, p_2)..., (a_n, p_n)
-        a learner and a teacher model. The loss computes a pairwise similarity matrix on the embeddings from the
-        learner model A and for the teacher model B and tunes the Mean squared error (A - B)^2. I.e.,
-        the learner is tuned to be consistend with the teacher.
+        Modes: 
+            "paired" accepts two lists where texts are parallel (i.e., similar).
+            "batch" accepts one list with texts.
     """
     def __init__(self, 
-            model: SentenceTransformer, 
-            teacher: SentenceTransformer,
-            similarity_fct = stutil.cos_sim, 
-            loss_fct: Callable = nn.MSELoss(),
-            scale: float = 5.0):
-        """
-        :param model: SentenceTransformer model
-        :param teacher: SentenceTransformer teacher, will be frozen
-        :param similarity_fct: similarity function between sentence embeddings. By default, cos_sim. Can also be set to dot product (and then set scale to 1)
-        :loss_fct: loss function
-        :param scale: Output of similarity function is multiplied by scale value
-        """
-        super(MultipleConsistencyLossPaired, self).__init__()
-        self.model = model
-        self.scale = scale
-        self.similarity_fct = similarity_fct
-        self.loss_fct = loss_fct
+                model: SentenceTransformer, 
+                teacher: SentenceTransformer,
+                mode: str = "paired",
+                similarity: str = "cosine",
+                loss_fct: Callable = nn.MSELoss(),
+                scale: float = 5.0):
         
+        super().__init__()
+        
+        assert mode in ["paired", "batch"]
+        assert similarity in util.SIMILARITY_REGISTRY
+
+        self.model = model
+        self.teacher = teacher
+        self.mode = mode
+        self.similarity_name = similarity
+        self.similarity_fct = util.SIMILARITY_REGISTRY[similarity]
+        self.loss_fct = loss_fct
+        self.scale = scale
+
         # freeze teacher
         self.teacher = teacher
         util.freeze_all_layers(self.teacher)
 
-    def forward(self, sentence_features: Iterable[Dict[str, Tensor]], labels: Tensor):
+    def forward(self,
+                sentence_features: Iterable[Dict[str, Tensor]],
+                labels: Tensor = None):
 
-        reps = [self.model(sentence_feature)['sentence_embedding'] for sentence_feature in sentence_features]
-        
-        embeddings_a = reps[0]
-        embeddings_b = torch.cat(reps[1:])
-        
-        teacher_reps = [self.teacher(sentence_feature)['sentence_embedding'] for sentence_feature in sentence_features]
-        teacher_embeddings_a = teacher_reps[0]
-        teacher_embeddings_b = torch.cat(teacher_reps[1:])
-        
-        # intra model pairwise sims
-        scores = self.similarity_fct(embeddings_a, embeddings_b) * self.scale
-        
-        # intra teacher pairwise sims
-        teacher_scores = self.similarity_fct(teacher_embeddings_a, teacher_embeddings_b) * self.scale
-        
-        # (teacher_sim - model_sim)^2
-        loss = self.loss_fct(scores, teacher_scores)
-        return loss
+        student_reps = [self.model(sf)["sentence_embedding"] for sf in sentence_features]
 
+        with torch.no_grad():
+            teacher_reps = [self.teacher(sf)["sentence_embedding"] for sf in sentence_features]
+
+        if self.mode == "paired":
+
+            s_a = student_reps[0]
+            s_b = torch.cat(student_reps[1:], dim=0)
+
+            t_a = teacher_reps[0]
+            t_b = torch.cat(teacher_reps[1:], dim=0)
+
+            score_s = self.similarity_fct(s_a, s_b) * self.scale
+            score_t = self.similarity_fct(t_a, t_b) * self.scale
+
+            return self.loss_fct(score_s, score_t)
+
+        # batch mode
+
+        s_all = torch.cat(student_reps, dim=0)
+        t_all = torch.cat(teacher_reps, dim=0)
+
+        sim_s = self.similarity_fct(s_all, s_all) * self.scale
+        sim_t = self.similarity_fct(t_all, t_all) * self.scale
+
+        return self.loss_fct(sim_s, sim_t)
+
+    
     def get_config_dict(self):
-        return {'scale': self.scale, 'similarity_fct': self.similarity_fct.__name__}
+        return {
+            "mode": self.mode,
+            "similarity": self.similarity_name,
+            "loss_fct": self.loss_fct.__class__.__name__,
+            "scale": self.scale,
+        }
 
 
-class MultipleConsistencyLossDirect(nn.Module):
-    """
-        This loss expects as input a batch consisting of sentences [s1, s2,...]
-        a learner and a teacher model. The loss computes a pairwise similarity matrix on the embeddings from the
-        learner model A and for the teacher model B and tunes the Mean squared error (A - B)^2. I.e.,
-        the learner is tuned to be consistend with the teacher.
-    """
-    def __init__(self, 
-            model: SentenceTransformer, 
-            teacher: SentenceTransformer,
-            similarity_fct = stutil.cos_sim, 
-            loss_fct: Callable = nn.MSELoss(),
-            scale: float = 5.0):
-        """
-        :param model: SentenceTransformer model
-        :param teacher: SentenceTransformer teacher, will be frozen
-        :param similarity_fct: similarity function between sentence embeddings. By default, cos_sim. Can also be set to dot product (and then set scale to 1)
-        :loss_fct: loss function
-        :param scale: Output of similarity function is multiplied by scale value
-        """
-        super(MultipleConsistencyLossDirect, self).__init__()
-        self.model = model
-        self.scale = scale
-        self.similarity_fct = similarity_fct
-        self.loss_fct = loss_fct
-        
-        # freeze teacher
-        self.teacher = teacher
-        util.freeze_all_layers(self.teacher)
+class MultiLossEvaluator(SentenceEvaluator):
 
-    def forward(self, sentence_features: Iterable[Dict[str, Tensor]], labels: Tensor):
+    def __init__(
+        self,
+        dataloader: torch.utils.data.DataLoader,
+        losses: Dict[str, nn.Module],
+        name: str = "",
+        write_csv: bool = True,
+    ):
+        self.dataloader = dataloader
+        self.losses = losses
+        self.name = name
+        self.write_csv = write_csv
 
-        reps = [self.model(sentence_feature)['sentence_embedding'] for sentence_feature in sentence_features]
-        embeddings = reps[0]
-        
-        teacher_reps = [self.teacher(sentence_feature)['sentence_embedding'] for sentence_feature in sentence_features]
-        teacher_embeddings = teacher_reps[0]
-        
-        # intra model pairwise sims
-        scores = self.similarity_fct(embeddings, embeddings) * self.scale
-        
-        # intra teacher pairwise sims
-        teacher_scores = self.similarity_fct(teacher_embeddings, teacher_embeddings) * self.scale
-        
-        # (teacher_sim - model_sim)^2
-        loss = self.loss_fct(scores, teacher_scores)
-        return loss
+        if name:
+            name = "_" + name
 
-    def get_config_dict(self):
-        return {'scale': self.scale, 'similarity_fct': self.similarity_fct.__name__}
+        self.csv_file = f"evaluation{name}_results.csv"
+        self.csv_headers = ["epoch", "steps", "score"] + list(losses.keys())
+
+    def __call__(self, model, output_path=None, epoch=-1, steps=-1):
+
+        model.eval()
+        self.dataloader.collate_fn = model.smart_batching_collate
+
+        loss_sums = {name: 0.0 for name in self.losses}
+        batches = 0
+
+        for batch in self.dataloader:
+            features, labels = batch
+
+            for idx in range(len(features)):
+                features[idx] = batch_to_device(features[idx], model.device)
+            labels = labels.to(model.device)
+
+            with torch.no_grad():
+                for name, loss_model in self.losses.items():
+                    loss_val = loss_model(features, labels=labels)
+                    loss_sums[name] += loss_val.item()
+
+            batches += 1
+
+        # Average losses
+        for name in loss_sums:
+            loss_sums[name] /= batches
+
+        total_loss = sum(loss_sums.values())
+        score = 1 - total_loss
+
+        # CSV writing
+        if output_path and self.write_csv:
+            csv_path = os.path.join(output_path, self.csv_file)
+
+            write_header = not os.path.isfile(csv_path)
+
+            with open(csv_path, "a", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f, delimiter=";")
+
+                if write_header:
+                    writer.writerow(self.csv_headers)
+
+                writer.writerow(
+                    [epoch, steps, score] +
+                    [loss_sums[name] for name in self.losses]
+                )
+
+        return score
 
 
 class DistilConsistencyEvaluator(SentenceEvaluator):

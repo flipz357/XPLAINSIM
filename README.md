@@ -39,14 +39,18 @@ A, tokens_a, tokens_b = model.postprocess_attributions(A, tokens_a, tokens_b, sp
 
 ### Idea<a id="space-shaping-idea"></a>
 
-The idea is as follows: You have a bunch of interpreatble measures (`my_metrics`) and wish that these are reflected within sub-embeddings (`features`), while not disturbing the overall similarity too much.
+The idea is as follows: We start with
+
+- `my_metrics`: A bunch of interpreatble measures that should be reflected in the embedding space.
+- `documents1`, `documents2`: Two lists with documents in string format.
+- `feature_names`, `feature_dims`: The name for each metric/feature and the number of dimensions it should be assigned.
+
+The following is Pseudo code, for an actual demo see further [below](space-shaping-toy).
 
 ```python
 from sentence_transformers import InputExample
 from xplain.spaceshaping import PartitionedSentenceTransformer
 
-# need some documents pairs, don't need to be paraphrases, or similar, just some documents
-list_with_strings, other_list_with_strings = ["abc",....], ["xyz",...]
 examples = []
 
 # compute the training/partitioning target
@@ -56,17 +60,17 @@ for x, y in zip(list_with_strings, other_list_with_strings):
 		similarities.append(metric.score(x, y))
 	examples.append(InputExample(texts=[x, y], label=similarities))
 
-# instantiate model and train, here we use 16 dimensions to express each metric
-pt = PartitionedSentenceTransformer(feature_names=[metric.name for metric in my_metrics], 
-                                    feature_dims=[16]*len(my_metrics))
-pt.train(examples)
+# instantiate model and train
+pt = PartitionedSentenceTransformer(feature_names, feature_dims)
+
+pt.train_model(examples)
 ```
 
-### Space Paritioning Example<a id="space-shaping-toy"></a>
+### Space Partitioning Example<a id="space-shaping-toy"></a>
 
 Here's a very simple example for training and inferring with a custom model.
 
-Needed: A training target. For every input text pair, a list with numbers. These numbers can be fine-grained interpretable measurements. They are then used to structure the embedding space. In this example, we would like to build a model that reflects superficial semantic similarity in one part of its embedding, similarity of named entities in another, and "deep" semantic similarity in the other. Concretely, we paritition the embedding into three features/parts
+Concretely, we paritition the embedding into three features/parts
 
 1. Bag-of-words: Learns to reflect bag-of-words distance
 2. Named entity similarity: Learns to reflect similarity of named entities
@@ -124,7 +128,7 @@ print(pearsonr([x.label[1] for x in some_examples_dev], [dic["ner"] for dic in j
 print(pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something"]))
 
 # train
-pt.train(some_examples, some_examples_dev)
+pt.train_model(some_examples, some_examples_dev)
 
 # eval correlation to custom metric after train
 json = pt.explain_similarity([x for x, y in some_pairs_dev], [y for x, y in some_pairs_dev])
@@ -157,6 +161,5 @@ This will print a json dictionary with aspectual graph matching scores.
 To also return the graphs and aspectual subgraphs, use `return_graphs=True` in `explain_similarity`.
 
 ## FAQ<a id="faq"></a>
-
 
 ## Citation<a id="citation"></a>
