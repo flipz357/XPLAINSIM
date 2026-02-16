@@ -57,20 +57,7 @@ class PartitionLoss(nn.Module):
             else:
                 self.register_parameter("score_bias", None)
     
-    """
-    def _partition(self, emb: Tensor):
-        slices = []
-        start = 0
-        for dim in self.feature_dims:
-            stop = start + dim
-            slices.append(emb[:, start:stop])
-            start = stop
-        return slices
-    """
-
-    def forward(self, sentence_features, labels):
-
-        reps = [self.model(sentence_feature)["sentence_embedding"] for sentence_feature in sentence_features]
+    def forward(self, reps, labels=None, sentence_features=None):
 
         if self.mode == "metric":
 
@@ -133,14 +120,11 @@ class ConsistencyLoss(nn.Module):
         self.scale = scale
 
         # freeze teacher
-        self.teacher = teacher
         util.freeze_all_layers(self.teacher)
 
-    def forward(self,
-                sentence_features: Iterable[Dict[str, Tensor]],
-                labels: Tensor = None):
+    def forward(self, reps, labels=None, sentence_features=None):
 
-        student_reps = [self.model(sf)["sentence_embedding"] for sf in sentence_features]
+        student_reps = reps 
 
         with torch.no_grad():
             teacher_reps = [self.teacher(sf)["sentence_embedding"] for sf in sentence_features]
@@ -178,6 +162,26 @@ class ConsistencyLoss(nn.Module):
         }
 
 
+class CombinedLoss(nn.Module):
+
+    def __init__(self, model: SentenceTransformer, losses: Dict[str, nn.Module]):
+        super().__init__()
+        self.model = model
+        self.losses = losses
+
+    def forward(self, sentence_features: Iterable[Dict[str, Tensor]], labels: Tensor = None):
+
+        # Compute student embeddings ONCE
+        reps = [self.model(sf)["sentence_embedding"] for sf in sentence_features]
+
+        total_loss = 0.0
+
+        for loss in self.losses.values():
+            total_loss += loss(reps, labels, sentence_features=sentence_features)
+
+        return total_loss
+
+"""
 class MultiLossEvaluator(SentenceEvaluator):
 
     def __init__(
@@ -245,80 +249,86 @@ class MultiLossEvaluator(SentenceEvaluator):
                 )
 
         return score
+"""
 
+class MultiLossEvaluator(SentenceEvaluator):
 
-class DistilConsistencyEvaluator(SentenceEvaluator):
-    """
-    Evaluate a model based on its accuracy on a labeled dataset
-    This requires a model with LossFunction.SOFTMAX
-    The results are written in a CSV. If a CSV already exists, then values are appended.
-    """
-
-    def __init__(self, dataloader: torch.utils.data.DataLoader, name: str = "", loss_model_distil = None, loss_model_consistency = None, write_csv: bool = True):
-        """
-        Constructs an evaluator for the given dataset
-        :param dataloader:
-            the data for the evaluation
-        """
+    def __init__(
+        self,
+        dataloader: torch.utils.data.DataLoader,
+        losses: Dict[str, nn.Module],
+        name: str = "",
+        write_csv: bool = True,
+    ):
         self.dataloader = dataloader
+        self.losses = losses
         self.name = name
-        self.loss_model_distil = loss_model_distil
-        self.loss_model_consistency = loss_model_consistency
+        self.write_csv = write_csv
 
         if name:
-            name = "_"+name
+            name = "_" + name
 
-        self.write_csv = write_csv
-        self.csv_file = "accuracy_evaluation" + name + "_results.csv"
-        self.csv_headers = ["epoch", "steps", "accuracy", "loss distill", "loss consistency", "biases"]
+        self.csv_file = f"evaluation{name}_results.csv"
+        self.csv_headers = ["epoch", "steps", "score"] + list(losses.keys())
 
-    def __call__(self, model, output_path: str = None, epoch: int = -1, steps: int = -1) -> float:
-        
+    def __call__(self, model, output_path=None, epoch=-1, steps=-1):
+
         model.eval()
-        if epoch != -1:
-            if steps == -1:
-                out_txt = " after epoch {}:".format(epoch)
-            else:
-                out_txt = " in epoch {} after {} steps:".format(epoch, steps)
-        else:
-            out_txt = ":"
-
-        logger.info("Evaluation on the " + self.name + " dataset" + out_txt)
         self.dataloader.collate_fn = model.smart_batching_collate
-        sum_mse_c = 0.0
-        sum_mse_d = 0.0
-        bxs = 0
-        for _, batch in enumerate(self.dataloader):
+
+        loss_sums = {name: 0.0 for name in self.losses}
+        batches = 0
+
+        for batch in self.dataloader:
             features, labels = batch
+
+            # Move to device
             for idx in range(len(features)):
                 features[idx] = batch_to_device(features[idx], model.device)
             labels = labels.to(model.device)
-            
-            
-            with torch.no_grad():
-                mse = self.loss_model_distil(features, labels=labels)
-            sum_mse_d += mse
-            with torch.no_grad():
-                mse = self.loss_model_consistency(features, labels=labels)
-            sum_mse_c += mse
-            bxs += 1
-         
-        accuracy = (sum_mse_d + sum_mse_c) / bxs
-        accuracy = 1 - accuracy
-        biases = list(self.loss_model_distil.score_bias.detach().cpu().numpy())
 
-        if output_path is not None and self.write_csv:
+            with torch.no_grad():
+
+                # Compute embeddings once
+                reps = [
+                    model(sf)["sentence_embedding"]
+                    for sf in features
+                ]
+
+                # Evaluate each loss using shared embeddings
+                for name, loss_model in self.losses.items():
+
+                    loss_val = loss_model(
+                        reps,
+                        labels=labels,
+                        sentence_features=features
+                    )
+
+                    loss_sums[name] += loss_val.item()
+
+            batches += 1
+
+        # Average losses
+        for name in loss_sums:
+            loss_sums[name] /= batches
+
+        total_loss = sum(loss_sums.values())
+        score = 1 - total_loss
+
+        # CSV writing
+        if output_path and self.write_csv:
             csv_path = os.path.join(output_path, self.csv_file)
-            if not os.path.isfile(csv_path):
-                with open(csv_path, newline='', mode="w", encoding="utf-8") as f:
-                    writer = csv.writer(f, delimiter=";")
-                    writer.writerow(self.csv_headers)
-                    writer.writerow([epoch, steps, accuracy, sum_mse_d, sum_mse_c, biases])
-            else:
-                with open(csv_path, newline='', mode="a", encoding="utf-8") as f:
-                    writer = csv.writer(f, delimiter=";")
-                    writer.writerow([epoch, steps, accuracy, sum_mse_d, sum_mse_c, biases])
-        else:
-            print(sum_mse_d, sum_mse_c)
-        return accuracy
+            write_header = not os.path.isfile(csv_path)
 
+            with open(csv_path, "a", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f, delimiter=";")
+
+                if write_header:
+                    writer.writerow(self.csv_headers)
+
+                writer.writerow(
+                    [epoch, steps, score] +
+                    [loss_sums[name] for name in self.losses]
+                )
+
+        return score

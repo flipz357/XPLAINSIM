@@ -5,8 +5,9 @@ from typing import List, Dict
 
 from sentence_transformers import SentenceTransformer
 from xplain.spaceshaping.losses_and_evaluators import (
-        PartitionLoss, 
-        ConsistencyLoss, 
+        PartitionLoss,
+        ConsistencyLoss,
+        CombinedLoss,
         MultiLossEvaluator
         )
 from xplain.spaceshaping import util
@@ -74,6 +75,9 @@ class PartitionedSentenceTransformer(SentenceTransformer):
     # Training
     # ------------------------------------------------------------------
 
+    
+
+
     def train_model(
         self,
         train_examples,
@@ -85,48 +89,44 @@ class PartitionedSentenceTransformer(SentenceTransformer):
         eval_steps: int = 200,
         save_path: str = None,
         write_csv: bool = True,
-        use_consistency: bool = True,
-    ):
+        use_consistency: bool = True):
         """
         Train the partitioned model.
         """
-
         train_dl = torch.utils.data.DataLoader(
-            train_examples,
-            shuffle=True,
-            batch_size=batch_size,
-        )
+        train_examples,
+        shuffle=True,
+        batch_size=batch_size)
 
         dev_dl = torch.utils.data.DataLoader(
             dev_examples,
             shuffle=False,
-            batch_size=batch_size,
-        )
+            batch_size=batch_size)
 
         losses = self._build_losses(use_consistency=use_consistency)
+
+        combined_loss = CombinedLoss(self, losses)
 
         evaluator = MultiLossEvaluator(
             dataloader=dev_dl,
             losses=losses,
-            write_csv=write_csv,
-        )
+            write_csv=write_csv)
 
         self.fit(
-            train_objectives=[(train_dl, loss) for loss in losses.values()],
+            train_objectives=[(train_dl, combined_loss)],
             optimizer_params={"lr": lr},
             epochs=epochs,
             warmup_steps=warmup_steps,
             evaluator=evaluator,
             evaluation_steps=eval_steps,
             output_path=save_path,
-            save_best_model=False,
-        )
+            save_best_model=False)
 
     # ------------------------------------------------------------------
     # Embedding Partition Utilities
     # ------------------------------------------------------------------
 
-    def split_embedding(self, embeddings: np.ndarray, include_residual: bool = True) -> Dict[str, np.ndarray]:
+    def split_embedding(self, embeddings: torch.Tensor, include_residual: bool = True) -> Dict[str, np.ndarray]:
         """
         Split embeddings into feature subspaces + residual.
         """
