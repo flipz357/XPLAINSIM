@@ -2,13 +2,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class AMRSimilarity():
+class AMRSimilarity:
 
     def __init__(self, parser_engine=None, measure=None, subgraph_extractor=None):
         
         if parser_engine is None:
             parser, reader, standardizer = self._build_parser_engine()
-        
+        else:
+            parser, reader, standardizer = parser_engine
+
         if measure is None:
             measure = self._build_measure()
         
@@ -73,7 +75,7 @@ class AMRSimilarity():
         name_subgraph_dict["global"] = self.standardizer.standardize(self.reader.string2graph(string_graph))
         return name_subgraph_dict
 
-    def explain_similarity(self, xsent: list, ysent:list, return_graphs=None):
+    def explain_similarity(self, xsent: list[str], ysent:list[str], return_graphs: bool = None) -> list[dict]:
         graphs1 = self.parser.parse_sents(xsent)
         graphs2 = self.parser.parse_sents(ysent)
         explanations = []
