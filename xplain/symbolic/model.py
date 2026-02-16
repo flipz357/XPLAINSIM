@@ -48,17 +48,10 @@ class AMRSimilarity:
         try:
             stog = amrlib.load_stog_model()
         except FileNotFoundError:
-            url = "https://github.com/bjascob/amrlib-models/releases/download/parse_xfm_bart_base-v0_1_0/model_parse_xfm_bart_base-v0_1_0.tar.gz"
-            logger.warning("Parser Model not accessible. I will try to download and install a default model from {}.".format(url))
-            amrlibpath = amrlib.__file__
-            amrlibpath = "/".join(amrlibpath.split("/")[:-1]) +"/"
-            import subprocess
-            subprocess.call(["mkdir", amrlibpath + "data"])
-            import urllib.request
-            urllib.request.urlretrieve(url, amrlibpath + "data/" + "model_parse_xfm_bart_base-v0_1_0.tar.gz")
-            subprocess.call(["tar", "-xvzf", amrlibpath + "data/model_parse_xfm_bart_base-v0_1_0.tar.gz", "-C", amrlibpath + "data/"])
-            subprocess.call(["mv", amrlibpath + "data/model_parse_xfm_bart_base-v0_1_0", amrlibpath + "data/model_stog"])
-            stog = amrlib.load_stog_model()
+                raise RuntimeError(
+        "AMR parser model not found.\n"
+        "Run `xplain-install-amr` to install the default model.")
+        
         parser = stog
         
         from smatchpp import data_helpers
@@ -75,7 +68,7 @@ class AMRSimilarity:
         name_subgraph_dict["global"] = self.standardizer.standardize(self.reader.string2graph(string_graph))
         return name_subgraph_dict
 
-    def explain_similarity(self, xsent: list[str], ysent:list[str], return_graphs: bool = None) -> list[dict]:
+    def explain_similarity(self, xsent: list[str], ysent:list[str], return_graphs: bool = False) -> list[dict]:
         graphs1 = self.parser.parse_sents(xsent)
         graphs2 = self.parser.parse_sents(ysent)
         explanations = []
