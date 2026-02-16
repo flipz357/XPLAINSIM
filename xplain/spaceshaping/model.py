@@ -126,7 +126,7 @@ class PartitionedSentenceTransformer(SentenceTransformer):
     # Embedding Partition Utilities
     # ------------------------------------------------------------------
 
-    def split_embedding(self, embeddings: torch.Tensor, include_residual: bool = True) -> Dict[str, np.ndarray]:
+    def split_embedding(self, embeddings: torch.Tensor, include_residual: bool = True) -> Dict[str, torch.Tensor]:
         """
         Split embeddings into feature subspaces + residual.
         """

@@ -59,6 +59,9 @@ class PartitionLoss(nn.Module):
     
     def forward(self, reps, labels=None, sentence_features=None):
 
+        if labels is None:
+            raise ValueError("PartitionLoss requires labels.")
+
         if self.mode == "metric":
 
             emb_a, emb_b = reps
