@@ -22,11 +22,15 @@ class AMRSimilarity:
         self.standardizer = standardizer
         self.measure = measure
         self.subgraph_extractor = subgraph_extractor
-
     
     @staticmethod
     def _build_measure():
-        from smatchpp import Smatchpp
+        try:
+            from smatchpp import Smatchpp
+        except ModuleNotFoundError as e:
+            from xplain.symbolic.parser_install import _AMRLIB_SMATCHPP_INSTALL_MESSAGE
+            raise ModuleNotFoundError(_AMRLIB_SMATCHPP_INSTALL_MESSAGE) from e
+        
         class DummyReader():
             def string2graph(self, input):
                 return input
@@ -38,23 +42,38 @@ class AMRSimilarity:
     
     @staticmethod
     def _build_subgraph_extractor():
-        from smatchpp.formalism.amr import tools as amrtools
+        try:
+            from smatchpp.formalism.amr import tools as amrtools
+        except ModuleNotFoundError as e:
+            from xplain.symbolic.parser_install import _AMRLIB_SMATCHPP_INSTALL_MESSAGE
+            raise ModuleNotFoundError(_AMRLIB_SMATCHPP_INSTALL_MESSAGE) from e
         subgraph_extractor = amrtools.AMRSubgraphExtractor()
         return subgraph_extractor
     
     @staticmethod
     def _build_parser_engine():
-        import amrlib
+        try:
+            import amrlib
+        except ModuleNotFoundError as e:
+            from xplain.symbolic.parser_install import _AMRLIB_SMATCHPP_INSTALL_MESSAGE
+            raise ModuleNotFoundError(_AMRLIB_SMATCHPP_INSTALL_MESSAGE) from e
         try:
             stog = amrlib.load_stog_model()
         except FileNotFoundError:
                 raise RuntimeError(
         "AMR parser model not found.\n"
         "Run `xplain-install-amr` to install the default model.")
-        
+        except AttributeError:
+            raise AttributeError ( "AMRlib might not work with newer versions of transformers, please install, e.g., transformers==4.49.0")
+
         parser = stog
         
-        from smatchpp import data_helpers
+        try:
+            from smatchpp import data_helpers
+        except ModuleNotFoundError as e:
+            from xplain.symbolic.parser_install import _AMRLIB_SMATCHPP_INSTALL_MESSAGE
+            raise ModuleNotFoundError(_AMRLIB_SMATCHPP_INSTALL_MESSAGE) from e
+        
         reader = data_helpers.PenmanReader()
         from smatchpp.formalism.amr import tools as amrtools
         standardizer = amrtools.AMRStandardizer()        
