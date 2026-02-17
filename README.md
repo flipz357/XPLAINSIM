@@ -1,6 +1,6 @@
  # Explaining Similarity
 
-A package for explaining and exploring semantic similarity through the eyes of text embedding models.
+A package for explaining and exploring semantic text similarity with diverse methods.
 
 ## Overview of Repository / Table of Contents
 
