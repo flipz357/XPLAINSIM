@@ -2,13 +2,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class AMRSimilarity():
+class AMRSimilarity:
 
     def __init__(self, parser_engine=None, measure=None, subgraph_extractor=None):
         
         if parser_engine is None:
             parser, reader, standardizer = self._build_parser_engine()
-        
+        else:
+            parser, reader, standardizer = parser_engine
+
         if measure is None:
             measure = self._build_measure()
         
@@ -20,11 +22,15 @@ class AMRSimilarity():
         self.standardizer = standardizer
         self.measure = measure
         self.subgraph_extractor = subgraph_extractor
-
     
     @staticmethod
     def _build_measure():
-        from smatchpp import Smatchpp
+        try:
+            from smatchpp import Smatchpp
+        except ModuleNotFoundError as e:
+            from xplain.symbolic.parser_install import _AMRLIB_SMATCHPP_INSTALL_MESSAGE
+            raise ModuleNotFoundError(_AMRLIB_SMATCHPP_INSTALL_MESSAGE) from e
+        
         class DummyReader():
             def string2graph(self, input):
                 return input
@@ -36,30 +42,38 @@ class AMRSimilarity():
     
     @staticmethod
     def _build_subgraph_extractor():
-        from smatchpp.formalism.amr import tools as amrtools
+        try:
+            from smatchpp.formalism.amr import tools as amrtools
+        except ModuleNotFoundError as e:
+            from xplain.symbolic.parser_install import _AMRLIB_SMATCHPP_INSTALL_MESSAGE
+            raise ModuleNotFoundError(_AMRLIB_SMATCHPP_INSTALL_MESSAGE) from e
         subgraph_extractor = amrtools.AMRSubgraphExtractor()
         return subgraph_extractor
     
     @staticmethod
     def _build_parser_engine():
-        import amrlib
+        try:
+            import amrlib
+        except ModuleNotFoundError as e:
+            from xplain.symbolic.parser_install import _AMRLIB_SMATCHPP_INSTALL_MESSAGE
+            raise ModuleNotFoundError(_AMRLIB_SMATCHPP_INSTALL_MESSAGE) from e
         try:
             stog = amrlib.load_stog_model()
         except FileNotFoundError:
-            url = "https://github.com/bjascob/amrlib-models/releases/download/parse_xfm_bart_base-v0_1_0/model_parse_xfm_bart_base-v0_1_0.tar.gz"
-            logger.warning("Parser Model not accessible. I will try to download and install a default model from {}.".format(url))
-            amrlibpath = amrlib.__file__
-            amrlibpath = "/".join(amrlibpath.split("/")[:-1]) +"/"
-            import subprocess
-            subprocess.call(["mkdir", amrlibpath + "data"])
-            import urllib.request
-            urllib.request.urlretrieve(url, amrlibpath + "data/" + "model_parse_xfm_bart_base-v0_1_0.tar.gz")
-            subprocess.call(["tar", "-xvzf", amrlibpath + "data/model_parse_xfm_bart_base-v0_1_0.tar.gz", "-C", amrlibpath + "data/"])
-            subprocess.call(["mv", amrlibpath + "data/model_parse_xfm_bart_base-v0_1_0", amrlibpath + "data/model_stog"])
-            stog = amrlib.load_stog_model()
+                raise RuntimeError(
+        "AMR parser model not found.\n"
+        "Run `xplain-install-amr` to install the default model.")
+        except AttributeError:
+            raise AttributeError ( "AMRlib might not work with newer versions of transformers, please install, e.g., transformers==4.49.0")
+
         parser = stog
         
-        from smatchpp import data_helpers
+        try:
+            from smatchpp import data_helpers
+        except ModuleNotFoundError as e:
+            from xplain.symbolic.parser_install import _AMRLIB_SMATCHPP_INSTALL_MESSAGE
+            raise ModuleNotFoundError(_AMRLIB_SMATCHPP_INSTALL_MESSAGE) from e
+        
         reader = data_helpers.PenmanReader()
         from smatchpp.formalism.amr import tools as amrtools
         standardizer = amrtools.AMRStandardizer()        
@@ -73,7 +87,7 @@ class AMRSimilarity():
         name_subgraph_dict["global"] = self.standardizer.standardize(self.reader.string2graph(string_graph))
         return name_subgraph_dict
 
-    def explain_similarity(self, xsent: list, ysent:list, return_graphs=None):
+    def explain_similarity(self, xsent: list[str], ysent:list[str], return_graphs: bool = False) -> list[dict]:
         graphs1 = self.parser.parse_sents(xsent)
         graphs2 = self.parser.parse_sents(ysent)
         explanations = []

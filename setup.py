@@ -7,7 +7,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='xplainsim',
-    version='0.0.2',    
+    version='0.9',    
     description='A Python package for explaining text similarity',
     url='https://github.com/flipz357/ExplainSimilarity',
     author='Juri Opitz, Andrianos Michail, Lucas Moeller',
@@ -16,10 +16,15 @@ setup(
     packages=['xplain', 'xplain.spaceshaping', 'xplain.attribution', 'xplain.symbolic'],
     long_description=long_description,
     long_description_content_type='text/markdown',
-    python_requires=">=3.8",
+    python_requires=">=3.9",
+    entry_points={
+        "console_scripts": [
+            "xplain-install-amr=xplain.symbolic.parser_install:install_default_amr_model",
+        ],
+    },
     install_requires=["torch", 
-                      "transformers", 
                       "transformers[torch]", 
                       "sentence-transformers", 
-                      "datasets"], 
+                      "datasets",
+                      "unidecode"], 
     classifiers=["License :: OSI Approved :: GNU General Public License v3 (GPLv3)"])
