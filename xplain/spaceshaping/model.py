@@ -14,6 +14,11 @@ from xplain.spaceshaping import util
 
 logger = logging.getLogger(__name__)
 
+def _cosine_sim(x, y):
+    return np.sum(x * y, axis=1) / (
+        np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
+    )
+
 class PartitionedSentenceTransformer(SentenceTransformer):
 
     def __init__(self,  feature_names: list[str], feature_dims: list[int], 
@@ -157,11 +162,6 @@ class PartitionedSentenceTransformer(SentenceTransformer):
         parts_a = self.split_embedding(emb_a)
         parts_b = self.split_embedding(emb_b)
 
-        def cosine_sim(x, y):
-            return np.sum(x * y, axis=1) / (
-                np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
-            )
-
         explanations = []
 
         for i in range(len(sent_a)):
@@ -173,13 +173,13 @@ class PartitionedSentenceTransformer(SentenceTransformer):
 
             # Feature-level similarities
             for name in self.feature_names:
-                explanation[name] = cosine_sim(
+                explanation[name] = _cosine_sim(
                     parts_a[name][i:i+1],
                     parts_b[name][i:i+1],
                 )[0]
 
             # Global similarity
-            explanation["global"] = cosine_sim(
+            explanation["global"] = _cosine_sim(
                 emb_a[i:i+1],
                 emb_b[i:i+1],
             )[0]
