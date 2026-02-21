@@ -1,4 +1,4 @@
- # XPLAINSIM: A Toolkit for Explaining Text Similarity
+# *XPLAINSIM*: A Toolkit for Explaining Text Similarity
 
 A research toolkit for decomposing and **explaining text similarity**
 across neural, structured, and symbolic levels. 
