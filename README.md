@@ -1,6 +1,6 @@
- # XPLAINSIM: An Explainability Toolkit for Text Similarity
+ # XPLAINSIM: A Toolkit for Explaining Text Similarity
 
-A package for explaining and exploring semantic text similarity with diverse methods.
+A package for explaining and exploring text similarity with diverse methods.
 
 ## Overview of Repository / Table of Contents
 
@@ -20,11 +20,12 @@ A package for explaining and exploring semantic text similarity with diverse met
 
 ## Installation<a id="requirements"></a>
 
-To install our package you can install using:
-
+You can install via pip with:
 ```
+
 pip install xplainsim
 ```
+
 ## Attributions <a id="attribution"></a>
 
 ### Example Code<a id="attributions-example"></a>
