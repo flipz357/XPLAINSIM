@@ -8,7 +8,9 @@ controlled embedding and metric alignment, and hybrid neural-symbolic text analy
 
 The toolkit is also modular: each explanation paradigm can be used independently or combined in hybrid setups.
 
-**Conceptual Overview**: XPLAINSIM provides three complementary explanation paradigms:
+#### Conceptual Overview
+
+XPLAINSIM currently provides three complementary explanation paradigms:
 
 | Module        | Explanation Level  | What it Does     |
 |---------------|--------------------|------------------|
@@ -16,7 +18,7 @@ The toolkit is also modular: each explanation paradigm can be used independently
 | SpaceShaping  | Embedding space    | Shape features to encode custom aspects |
 | Symbolic      | Graph level        | Explain which semantic roles/aspects align |
 
-**Overview of Repository / Table of Contents:**
+#### Overview of Repository / Table of Contents
 
 - [Installation](#requirements)
 - [**Attributions**](#attribution)
