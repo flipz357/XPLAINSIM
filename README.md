@@ -21,8 +21,8 @@ A package for explaining and exploring text similarity with diverse methods.
 ## Installation<a id="requirements"></a>
 
 You can install via pip with:
-```
 
+```
 pip install xplainsim
 ```
 
