@@ -3,28 +3,20 @@
 A research toolkit for decomposing and **explaining text similarity**
 across neural, structured, and symbolic levels. 
 
-It provides:
-- Token-level attribution for neural similarity models
-- Feature-partitioned neural embedding spaces (Space Shaping)
-- Graph-based symbolic similarity via Abstract Meaning Representation
-
 The toolkit is designed for interpretability research,
 controlled embedding and metric alignment, and hybrid neural-symbolic text analysis.
 
 The toolkit is also modular: each explanation paradigm can be used independently or combined in hybrid setups.
 
-
-## Conceptual Overview
-
-XPLAINSIM provides three complementary explanation paradigms:
+**Conceptual Overview**: XPLAINSIM provides three complementary explanation paradigms:
 
 | Module        | Explanation Level  | What it Does     |
 |---------------|--------------------|------------------|
 | Attribution   | Token level        | Explain which tokens drive similarity |
-| SpaceShaping  | Embedding space    | Shape dimensions to encode custom aspects |
+| SpaceShaping  | Embedding space    | Shape features to encode custom aspects |
 | Symbolic      | Graph level        | Explain which semantic roles/aspects align |
 
-## Overview of Repository / Table of Contents
+**Overview of Repository / Table of Contents:**
 
 - [Installation](#requirements)
 - [**Attributions**](#attribution)
