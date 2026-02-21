@@ -1,20 +1,41 @@
  # XPLAINSIM: A Toolkit for Explaining Text Similarity
 
-A package for explaining and exploring text similarity with diverse methods.
+A research toolkit for decomposing and **explaining text similarity**
+across neural, structured, and symbolic levels. 
+
+It provides:
+- Token-level attribution for neural similarity models
+- Feature-partitioned neural embedding spaces (Space Shaping)
+- Graph-based symbolic similarity via Abstract Meaning Representation
+
+The toolkit is designed for interpretability research,
+controlled embedding and metric alignment, and hybrid neural-symbolic text analysis.
+
+The toolkit is also modular: each explanation paradigm can be used independently or combined in hybrid setups.
+
+
+## Conceptual Overview
+
+XPLAINSIM provides three complementary explanation paradigms:
+
+| Module        | Explanation Level  | What it Does     |
+|---------------|--------------------|------------------|
+| Attribution   | Token level        | Explain which tokens drive similarity |
+| SpaceShaping  | Embedding space    | Shape dimensions to encode custom aspects |
+| Symbolic      | Graph level        | Explain which semantic roles/aspects align |
 
 ## Overview of Repository / Table of Contents
 
-
 - [Installation](#requirements)
 - [**Attributions**](#attribution)
-	- [Example Code](#attributions-example)
-	- [Expansion: Subtokens-to-Tokens](#attributions-subtokens-to-tokens)  
-	- [Expansion: Cross-Linguality](#attributions-cross-linguality)
-- [**SpaceShaping**](#space-shaping)
+    - [Idea](#attribution-idea)
+    - [Examples](#attributions-example)
+- [**Space Shaping**](#space-shaping)
     - [Idea](#space-shaping-idea)
-    - [Example](#space-shaping-example)
+    - [Examples](#space-shaping-example)
 - [**Symbolic**](#symbolic)
-    - [AMR parsing and multi-subgraph metric](#amr)
+    - [Idea](#symbolic-idea)
+    - [Example](#symbolic-example)
 - [FAQ](#faq)
 - [Citation](#citation)
 
@@ -26,46 +47,72 @@ You can install via pip with:
 pip install xplainsim
 ```
 
+That's it. Only when using the Symbolic module with the default parser one [small extra installation](#symbolic-extra-install) is necessary.
+
 ## Attributions <a id="attribution"></a>
 
-### Example Code<a id="attributions-example"></a>
+### Idea<a id="attribution-idea"></a>
+
+Token-level attribution decomposes embedding similarity into fine-grained token interactions between two texts.
+
+Given a neural embedding model and two texts we trace the similarity back to interactions of individual input tokens. 
+
+The explanation is a matrix over the tokens from each input (the sum of this matrix approximates the similarity of the embeddings).
+
+### Example<a id="attributions-example"></a>
+
+#### Show Currently Available Models
+
+```python
+print(ModelFactory.show_options()) # shows available model names, use in build below
+```
+
+#### Compute Attributions
 
 ```python
 from xplain.attribution import ModelFactory
-print(ModelFactory.show_options()) # shows available model names, use in build below
-model = ModelFactory.build("huggingface_id") # e.g sentence-transformers/all-mpnet-base-v2
+model = ModelFactory.build("sentence-transformers/all-mpnet-base-v2") # use print(ModelFactory.show_options()) to show others
 texta = 'The dog runs after the kitten in the yard.'
 textb = 'Outside in the garden the cat is chased by the dog.'
 A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
 ```
 
-### Expansion: Subtokens-to-Tokens<a id="attributions-subtokens-to-tokens"></a>
+Example output structure:
+
+- `A`: token-level contribution matrix
+- `tokens_a`: token list for text A
+- `tokens_b`: token list for text B
+
+#### Expansion: Subtokens-to-Tokens<a id="attributions-subtokens-to-tokens"></a>
 ```python
 # same as above, then
 A, tokens_a, tokens_b = model.postprocess_attributions(A, tokens_a, tokens_b, sparsification_method="FlowAlign")
 ```
 
-### Expansion: Cross-Linguality <a id="attributions-cross-linguality"></a>
+#### Expansion: Cross-Linguality <a id="attributions-cross-linguality"></a>
 ```python
 from xplain.attribution import ModelFactory
-print(ModelFactory.show_options()) # shows available model names, use in build below
-model = ModelFactory.build("huggingface_id") # a multilingual model, e.g Alibaba-NLP/gte-multilingual-base
+model = ModelFactory.build("Alibaba-NLP/gte-multilingual-base") # use print(ModelFactory.show_options()) to show others
 texta = 'The dog runs after the kitten in the yard.'
 textb = 'Im Garten rennt der Hund der Katze hinterher.'
 A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
 ```
 
-## SpaceShaping<a id="space-shaping"></a>
+
+## Space Shaping<a id="space-shaping"></a>
 
 ### Idea<a id="space-shaping-idea"></a>
 
-The idea is as follows: We start with
+Space Shaping enforces interpretable structure inside embedding spaces.
 
-- `my_metrics`: Some interpretable measures that should be reflected in the embedding space.
-- `documents1`, `documents2`: Two lists with documents in string format.
-- `feature_names`, `feature_dims`: The name for each metric/feature and the number of dimensions it should be assigned.
+Instead of learning a monolithic embedding, the vector is partitioned into
+dedicated subspaces, each trained to reflect a predefined interpretable metric
+(e.g., bag-of-words overlap, named entity similarity, sentiment, etc.).
 
-The following is Pseudo code, for an actual demo see further [below](space-shaping-toy).
+This enables:
+- Controllable similarity decomposition
+- Feature-aligned embeddings
+- Hybrid symbolic–neural objectives
 
 ```python
 from sentence_transformers import InputExample
@@ -76,6 +123,7 @@ examples = []
 # compute the training/partitioning target
 for x, y in zip(list_with_strings, other_list_with_strings):
 	similarities = []
+        # Metrics/aspects that should be reflected in the embedding space
 	for metric in my_metrics:
 		similarities.append(metric.score(x, y))
 	examples.append(InputExample(texts=[x, y], label=similarities))
@@ -86,18 +134,17 @@ pt = PartitionedSentenceTransformer(feature_names, feature_dims)
 pt.train_model(examples)
 ```
 
-
-### Space Paritioning Example<a id="space-shaping-example"></a>
+### Space Partitioning Example<a id="space-shaping-example"></a>
 
 Here's a very simple example for training and inferring with a custom model.
 
-Concretely, we paritition the embedding into three features/parts
+Concretely, we partition the embedding into three features/parts
 
 1. Bag-of-words: Learns to reflect bag-of-words distance
 2. Named entity similarity: Learns to reflect similarity of named entities
 3. (Not explicitly trained): Residual features for capturing the semantic similarity that makes for "the rest"
 
-Note that this is only a toy code, and the training happens on little data, however, the feature paritioning will already have some effect.
+Note that this is only a toy code, and the training happens on little data, however, the feature partitioning will already have some effect.
 
 ```python
 from scipy.stats import pearsonr
@@ -139,6 +186,8 @@ some_examples_dev = [InputExample(texts=[x1, x2], label=target_dev[i]) for (i, (
 
 # init model
 pt = PartitionedSentenceTransformer(feature_names=["bow", "ner"], feature_dims=[32, 32])
+
+# explanation can be called before training, but it's meaningless, just to compare to later
 json = pt.explain_similarity([x for x, y in some_pairs_dev], [y for x, y in some_pairs_dev])
 
 # eval correlation to custom metric before training
@@ -162,12 +211,31 @@ print(pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something
 
 ## Symbolic<a id="symbolic"></a>
 
-### AMR Parsing and Multi-Subgraph Metric<a id="amr"></a>
 
-The approch consists roughly in two steps:
+### Idea<a id="symbolic-idea"></a>
 
-1. Parse each input text to an Abstract Meaning Representation Graph
-2. Match those Meaning Graphs with Graph Similarity Metrics, also with regard to aspectual subgraphs as elicited in AMR (e.g., Agent, Patient, Negation,...)
+Unlike pure neural similarity, this approach decomposes similarity
+along semantic roles (Agent, Patient, Negation, etc.), enabling
+aspect-level semantic comparison.
+
+This is based on comparing AMR graphs of texts. Abstract Meaning Representation (AMR) encodes sentence meaning as a graph of concepts and semantic roles.
+
+**Installation note**<a id="symbolic-extra-install"></a>: 
+
+For using the Symbolic module with the default parser one small extra installation is necessary:
+
+```
+xplain-install-amr
+```
+
+Ensure also that for this `transformers<5` is installed, as the default AMR parser is not yet compatible with version 5.
+
+### Example<a id="amr"></a>
+
+The approach consists roughly in two steps:
+
+1. Parse each input text to an AMR Graph that expresses the text semantics in a symbolic way
+2. Match those Meaning Graphs with Graph Similarity Metrics to elicit meaning similarity aspects (e.g., Agent, Patient, Negation,...)
 
 ```python
 from xplain.symbolic.model import AMRSimilarity
