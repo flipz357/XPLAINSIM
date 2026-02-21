@@ -146,6 +146,8 @@ from scipy.stats import pearsonr
 from xplain.spaceshaping import PartitionedSentenceTransformer
 from sentence_transformers import InputExample
 from datasets import load_dataset
+
+# We will later use this to create a custom "Named Entity" metric
 import spacy
 nlp=spacy.load("en_core_web_sm")
 
