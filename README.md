@@ -58,6 +58,7 @@ The explanation is a matrix over the tokens from each input (the sum of this mat
 #### Show Currently Available Models
 
 ```python
+from xplain.attribution import ModelFactory
 print(ModelFactory.show_options()) # shows available model names, use in build below
 ```
 
