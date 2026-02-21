@@ -61,7 +61,7 @@ A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True,
 
 The idea is as follows: We start with
 
-- `my_metrics`: A bunch of interpreatble measures that should be reflected in the embedding space.
+- `my_metrics`: Some interpretable measures that should be reflected in the embedding space.
 - `documents1`, `documents2`: Two lists with documents in string format.
 - `feature_names`, `feature_dims`: The name for each metric/feature and the number of dimensions it should be assigned.
 
