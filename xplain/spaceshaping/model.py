@@ -14,22 +14,21 @@ from xplain.spaceshaping import util
 
 logger = logging.getLogger(__name__)
 
-def _cosine_sim(x, y):
-    return np.sum(x * y, axis=1) / (
-        np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
-    )
 
 class PartitionedSentenceTransformer(SentenceTransformer):
 
     def __init__(self,  feature_names: list[str], feature_dims: list[int], 
-            base_model_uri: str = "all-MiniLM-L12-v2", 
+            base_model_uri: str = "all-MiniLM-L12-v2", similarity: str = "cosine", 
             device: str = "cpu", tune_n_layers: str = 2):
         
         super().__init__(base_model_uri, device=device)
 
         assert len(feature_names) == len(feature_dims)
         assert sum(feature_dims) <= self.get_sentence_embedding_dimension()
-
+        assert similarity in util.SIMILARITY_REGISTRY
+        
+        self.similarity_name = similarity
+        self.similarity_fct = util.SIMILARITY_REGISTRY[similarity]
         self.feature_names = feature_names
         self.feature_dims = feature_dims
         self.n_features = len(feature_names)
@@ -61,7 +60,7 @@ class PartitionedSentenceTransformer(SentenceTransformer):
             model=self,
             mode="metric",
             feature_dims=self.feature_dims,
-            similarity="cosine",
+            similarity=self.similarity_name,
         )
 
         # Optional teacher consistency
@@ -71,7 +70,7 @@ class PartitionedSentenceTransformer(SentenceTransformer):
                 model=self,
                 teacher=teacher,
                 mode="batch",
-                similarity="cosine",
+                similarity=self.similarity_name,
             )
 
         return losses
@@ -79,9 +78,6 @@ class PartitionedSentenceTransformer(SentenceTransformer):
     # ------------------------------------------------------------------
     # Training
     # ------------------------------------------------------------------
-
-    
-
 
     def train_model(
         self,
@@ -156,11 +152,21 @@ class PartitionedSentenceTransformer(SentenceTransformer):
         Return feature-wise similarity explanations.
         """
 
-        emb_a = self.encode(sent_a)
-        emb_b = self.encode(sent_b)
+        emb_a = self.encode(sent_a, convert_to_tensor=True)
+        emb_b = self.encode(sent_b, convert_to_tensor=True)
 
         parts_a = self.split_embedding(emb_a)
         parts_b = self.split_embedding(emb_b)
+        
+        # Precompute all similarities in batch
+        feature_sims = {}
+        for name in self.feature_names:
+            feature_sims[name] = self.similarity_fct(
+                parts_a[name],
+                parts_b[name]
+            )
+
+        global_sims = self.similarity_fct(emb_a, emb_b)
 
         explanations = []
 
@@ -169,21 +175,12 @@ class PartitionedSentenceTransformer(SentenceTransformer):
             explanation = {
                 "sent_a": sent_a[i],
                 "sent_b": sent_b[i],
+                "global": global_sims[i].item(),
             }
 
-            # Feature-level similarities
             for name in self.feature_names:
-                explanation[name] = _cosine_sim(
-                    parts_a[name][i:i+1],
-                    parts_b[name][i:i+1],
-                )[0]
-
-            # Global similarity
-            explanation["global"] = _cosine_sim(
-                emb_a[i:i+1],
-                emb_b[i:i+1],
-            )[0]
+                explanation[name] = feature_sims[name][i].item()
 
             explanations.append(explanation)
 
-        return explanations
+        return explanations 
