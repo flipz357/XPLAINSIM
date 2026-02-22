@@ -9,7 +9,7 @@ setup(
     name='xplainsim',
     version='0.9',    
     description='A Python package for explaining text similarity',
-    url='https://github.com/flipz357/ExplainSimilarity',
+    url='https://github.com/flipz357/XPLAINSIM',
     author='Juri Opitz, Andrianos Michail, Lucas Moeller',
     author_email='opitz.sci@gmail.com',
     license='GPLv3',
