@@ -1,4 +1,5 @@
 import logging
+from typing import Union, List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -87,14 +88,31 @@ class AMRSimilarity:
         name_subgraph_dict["global"] = self.standardizer.standardize(self.reader.string2graph(string_graph))
         return name_subgraph_dict
 
-    def explain_similarity(self, xsent: list[str], ysent:list[str], return_graphs: bool = False) -> list[dict]:
-        graphs1 = self.parser.parse_sents(xsent)
-        graphs2 = self.parser.parse_sents(ysent)
+    def explain_similarity(self, 
+                           sent_a: Union[str, List[str]], sent_b: Union[str, List[str]], 
+                           return_graphs: bool = False
+                           ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        
+        single_input = False
+
+        if isinstance(sent_a, str) and isinstance(sent_b, str):
+            sent_a = [sent_a]
+            sent_b = [sent_b]
+            single_input = True
+        elif isinstance(sent_a, str) or isinstance(sent_b, str):
+            raise ValueError("sent_a and sent_b must both be strings or both lists")
+
+        if len(sent_a) != len(sent_b):
+            raise ValueError("sent_a and sent_b must have the same length")
+        
+        graphs1 = self.parser.parse_sents(sent_a)
+        graphs2 = self.parser.parse_sents(sent_b)
         explanations = []
-        for string_graph1_raw, string_graph2_raw in zip(graphs1, graphs2):
+        i = 0
+        for sa, sb, string_graph1_raw, string_graph2_raw in zip(sent_a, sent_b, graphs1, graphs2):
             name_subgraph_dict1 = self._raw_string_graph_to_subgraph_dict(string_graph1_raw)
             name_subgraph_dict2 = self._raw_string_graph_to_subgraph_dict(string_graph2_raw)
-            result = {}
+            result = {"sent_a": sa, "sent_b": sb}
             for graph_type in name_subgraph_dict1:
                 g1s = name_subgraph_dict1[graph_type]
                 g2s = name_subgraph_dict2[graph_type]
@@ -103,4 +121,5 @@ class AMRSimilarity:
                     result[graph_type]["subgraph1"] = g1s
                     result[graph_type]["subgraph2"] = g2s
             explanations.append(result)
-        return explanations
+            i += 1
+        return explanations[0] if single_input else explanations

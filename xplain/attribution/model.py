@@ -1,10 +1,12 @@
 from sentence_transformers import models, SentenceTransformer
 import torch
+from torch import Tensor
 import os
 import json
 import numpy as np
 from tqdm import tqdm
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union, List, Dict
+
 
 from xplain.attribution.utils import input_to_device
 from xplain.attribution.postprocessing import (
@@ -158,40 +160,59 @@ class XSTransformer(SentenceTransformer):
         J = torch.stack(jacobi) / self.N_steps
         J = J[:, :-1, :, :].sum(dim=1)
         return J
-
+     
     def explain_similarity(
         self,
-        text_a: str,
-        text_b: str,
+        sent_a: Union[List[str], str],
+        sent_b: Union[List[str], str],
         sim_measure: str = "cos",
         return_lhs_terms: bool = False,
         move_to_cpu: bool = False,
         verbose: bool = True,
         compress_embedding_dim: bool = True,
         dims: Optional[Tuple] = None,
-        device: torch.device = torch.device("cuda:0"),
+        device: Optional[torch.device] = None,
         **kwargs,
-    ):
+        ) -> Union[Tuple[Tensor, List[str], List[str]],
+                   List[Tuple[Tensor, List[str], List[str]]]]:
+        
+        if device is None:
+            device = next(self.parameters()).device
 
-        assert sim_measure in [
-            "cos",
-            "dot",
-        ], f"invalid argument for sim_measure: {sim_measure}"
+        if sim_measure not in {"cos", "dot"}:
+            raise ValueError(f"invalid argument for sim_measure: {sim_measure}, must be cos or dot")
+
+        self.intermediates.clear()
+        # device = self[0].auto_model.embeddings.word_embeddings.weight.device 
+        
+        if isinstance(sent_a, list) and isinstance(sent_b, list):
+            explanations = []
+            for (sa, sb) in zip(sent_a, sent_b):
+                output = self.explain_similarity(
+                                     sa, 
+                                     sb, 
+                                     sim_measure, 
+                                     return_lhs_terms, 
+                                     move_to_cpu, 
+                                     verbose, 
+                                     compress_embedding_dim, 
+                                     dims, 
+                                     device)
+                if not explanations:
+                    for i, item in enumerate(output):
+                        explanations.append([item])
+                else:
+                    for i, item in enumerate(output):
+                        explanations[i].append(item)
+            return explanations
+        elif isinstance(sent_a, list) or isinstance(sent_b, list):
+            raise ValueError("sent_a and sent_b must both be strings or both lists")
 
         self.intermediates.clear()
         # device = self[0].auto_model.embeddings.word_embeddings.weight.device
 
         # TODO: this should be a method
-        assert sim_measure in [
-            "cos",
-            "dot",
-        ], f"invalid argument for sim_measure: {sim_measure}"
-
-        self.intermediates.clear()
-        # device = self[0].auto_model.embeddings.word_embeddings.weight.device
-
-        # TODO: this should be a method
-        inpt_a = self[0].tokenize([text_a])
+        inpt_a = self[0].tokenize([sent_a])
         input_to_device(inpt_a, device)
         features_a = self.forward(inpt_a, **kwargs)
         emb_a = features_a["sentence_embedding"]
@@ -207,7 +228,7 @@ class XSTransformer(SentenceTransformer):
         da = interm_a[0] - interm_a[-1]
         da = da.reshape(Sa * Da, 1).detach()
 
-        inpt_b = self[0].tokenize([text_b])
+        inpt_b = self[0].tokenize([sent_b])
         input_to_device(inpt_b, device)
         features_b = self.forward(inpt_b, **kwargs)
         emb_b = features_b["sentence_embedding"]
@@ -239,8 +260,8 @@ class XSTransformer(SentenceTransformer):
             A = A.sum(dim=(1, 3))
         A = A.detach().cpu()
 
-        tokens_a = self.tokenize_text(text_a)
-        tokens_b = self.tokenize_text(text_b)
+        tokens_a = self.tokenize_text(sent_a)
+        tokens_b = self.tokenize_text(sent_b)
 
         if return_lhs_terms:
             ref_a = features_a["reference"]

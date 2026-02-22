@@ -78,7 +78,8 @@ Example output structure:
 - `tokens_a`: token list for text A
 - `tokens_b`: token list for text B
 
-#### Expansion: Subtokens-to-Tokens<a id="attributions-subtokens-to-tokens"></a>
+#### Expansion: Token Alignment<a id="attributions-subtokens-to-tokens"></a>
+
 ```python
 # same as above, then
 A, tokens_a, tokens_b = model.postprocess_attributions(A, tokens_a, tokens_b, sparsification_method="FlowAlign")
@@ -229,6 +230,8 @@ Ensure also that for this `transformers<5` is installed, as the default AMR pars
 
 ### Example<a id="amr"></a>
 
+#### Explaining Similarity
+
 The approach consists roughly in two steps:
 
 1. Parse each input text to an AMR Graph that expresses the text semantics in a symbolic way
@@ -244,6 +247,9 @@ print(exp)
 ```
 
 This will print a json dictionary with aspectual graph matching scores. 
+
+#### Return AMR graphs
+
 To also return the graphs and aspectual subgraphs, use `return_graphs=True` in `explain_similarity`.
 
 ## FAQ<a id="faq"></a>
