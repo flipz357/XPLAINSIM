@@ -69,7 +69,7 @@ from xplain.attribution import ModelFactory
 model = ModelFactory.build("sentence-transformers/all-mpnet-base-v2") # use print(ModelFactory.show_options()) to show others
 texta = 'The dog runs after the kitten in the yard.'
 textb = 'Outside in the garden the cat is chased by the dog.'
-A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
+A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cosine')
 ```
 
 Example output structure:
@@ -91,7 +91,7 @@ from xplain.attribution import ModelFactory
 model = ModelFactory.build("Alibaba-NLP/gte-multilingual-base") # use print(ModelFactory.show_options()) to show others
 texta = 'The dog runs after the kitten in the yard.'
 textb = 'Im Garten rennt der Hund der Katze hinterher.'
-A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cos')
+A, tokens_a, tokens_b = model.explain_similarity(texta, textb, move_to_cpu=True, sim_measure='cosine')
 ```
 
 

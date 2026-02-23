@@ -186,7 +186,7 @@ class XSTransformer(SentenceTransformer):
         self,
         sent_a: Union[List[str], str],
         sent_b: Union[List[str], str],
-        sim_measure: str = "cos",
+        sim_measure: str = "cosine",
         return_lhs_terms: bool = False,
         move_to_cpu: bool = False,
         verbose: bool = True,
@@ -200,7 +200,7 @@ class XSTransformer(SentenceTransformer):
         if device is None:
             device = next(self.parameters()).device
 
-        if sim_measure not in {"cos", "dot"}:
+        if sim_measure not in {"cosine", "dot"}:
             raise ValueError(f"invalid argument for sim_measure: {sim_measure}, must be cos or dot")
 
         self.intermediates.clear()
@@ -244,7 +244,7 @@ class XSTransformer(SentenceTransformer):
             emb_a = emb_a.detach().cpu()
             emb_b = emb_b.detach().cpu()
         A = da * J * db.T
-        if sim_measure == "cos":
+        if sim_measure == "cosine":
             A = A / torch.norm(emb_a[0]) / torch.norm(emb_b[0])
         A = A.reshape(Sa, Da, Sb, Db)
         if compress_embedding_dim:
@@ -263,7 +263,7 @@ class XSTransformer(SentenceTransformer):
             if move_to_cpu:
                 ref_a = ref_a.detach().cpu()
                 ref_b = ref_b.detach().cpu()
-            if sim_measure == "cos":
+            if sim_measure == "cosine":
                 score = torch.cosine_similarity(
                     emb_a[0].unsqueeze(0), emb_b[0].unsqueeze(0)
                 ).item()
