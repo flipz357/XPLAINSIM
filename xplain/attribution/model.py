@@ -160,6 +160,27 @@ class XSTransformer(SentenceTransformer):
         J = torch.stack(jacobi) / self.N_steps
         J = J[:, :-1, :, :].sum(dim=1)
         return J
+
+    def _process(self, sent: str, intermediates_index: int, move_to_cpu: bool = False, 
+            verbose: bool = True, dims: Optional[Tuple] = None, 
+            device: Optional[torch.device] = None, **kwargs) -> Tensor:
+
+        inpt = self[0].tokenize([sent])
+        input_to_device(inpt, device)
+        features = self.forward(inpt, **kwargs)
+        emb = features["sentence_embedding"]
+        if dims is not None:
+            emb = emb[:, dims[0] : dims[1]]
+        interm = self.intermediates[intermediates_index]
+        J = self._compute_integrated_jacobian(
+            emb, interm, move_to_cpu=move_to_cpu, verbose=verbose
+        )
+        D, S, D = J.shape
+        J = J.reshape((D, S * D))
+
+        d = interm[0] - interm[-1]
+        d = d.reshape(S * D, 1).detach()
+        return emb, d, J, S, D
      
     def explain_similarity(
         self,
@@ -211,39 +232,9 @@ class XSTransformer(SentenceTransformer):
         self.intermediates.clear()
         # device = self[0].auto_model.embeddings.word_embeddings.weight.device
 
-        # TODO: this should be a method
-        inpt_a = self[0].tokenize([sent_a])
-        input_to_device(inpt_a, device)
-        features_a = self.forward(inpt_a, **kwargs)
-        emb_a = features_a["sentence_embedding"]
-        if dims is not None:
-            emb_a = emb_a[:, dims[0] : dims[1]]
-        interm_a = self.intermediates[0]
-        J_a = self._compute_integrated_jacobian(
-            emb_a, interm_a, move_to_cpu=move_to_cpu, verbose=verbose
-        )
-        D, Sa, Da = J_a.shape
-        J_a = J_a.reshape((D, Sa * Da))
-
-        da = interm_a[0] - interm_a[-1]
-        da = da.reshape(Sa * Da, 1).detach()
-
-        inpt_b = self[0].tokenize([sent_b])
-        input_to_device(inpt_b, device)
-        features_b = self.forward(inpt_b, **kwargs)
-        emb_b = features_b["sentence_embedding"]
-        if dims is not None:
-            emb_b = emb_b[:, dims[0] : dims[1]]
-        interm_b = self.intermediates[1]
-        J_b = self._compute_integrated_jacobian(
-            emb_b, interm_b, move_to_cpu=move_to_cpu, verbose=verbose
-        )
-        _, Sb, Db = J_b.shape
-        J_b = J_b.reshape((D, Sb * Db))
-
-        db = interm_b[0] - interm_b[-1]
-        db = db.reshape(Sb * Db, 1).detach()
-
+        emb_a, da, J_a, Sa, Da = self._process(sent_a, 0)
+        emb_b, db, J_b, Sb, Db = self._process(sent_b, 1)
+        
         J = torch.mm(J_a.T, J_b)
         da = da.repeat(1, Sb * Db)
         db = db.repeat(1, Sa * Da)
