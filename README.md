@@ -248,9 +248,9 @@ print(exp)
 
 This will print a json dictionary with aspectual graph matching scores. 
 
-#### Return AMR graphs
+#### Return AMR graphs And Graph Alignments
 
-To also return the graphs and aspectual subgraphs, use `return_graphs=True` in `explain_similarity`.
+To also return the graphs and aspectual subgraphs (including node alignments), use `return_graphs=True` in `explain_similarity`.
 
 ## FAQ<a id="faq"></a>
 
