@@ -249,12 +249,11 @@ class PartitionedSentenceTransformer(SentenceTransformer):
         
         # Precompute all similarities in batch
         feature_sims = {}
-        for name in self.feature_names:
+        for name in self.feature_names + ["residual"]:
             feature_sims[name] = self.similarity_fct(
                 parts_a[name],
                 parts_b[name]
             )
-
         global_sims = self.similarity_fct(emb_a, emb_b)
 
         explanations = []
@@ -264,11 +263,12 @@ class PartitionedSentenceTransformer(SentenceTransformer):
             explanation = {
                 "sent_a": sent_a[i],
                 "sent_b": sent_b[i],
-                "global": global_sims[i].item(),
             }
 
-            for name in self.feature_names:
+            for name in self.feature_names + ["residual"]:
                 explanation[name] = feature_sims[name][i].item()
+            
+            explanation["global"] = global_sims[i].item()
 
             explanations.append(explanation)
         

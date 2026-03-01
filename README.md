@@ -161,10 +161,8 @@ some_pairs_dev = list(zip([dic["sentence1"] for dic in ds["validation"]], [dic["
 
 # let's build our target metrics that should be reflected within the embedding space,
 def bow_sim(x1, x2):
-	x1 = set(x1.split())
-	x2 = set(x2.split())
-	inter = x1.intersection(x2)
-	union = x1.union(x2)
+	x1, x2 = set(x1.split()), set(x2.split())
+	inter, union = x1.intersection(x2), x1.union(x2)
 	return len(inter) / len(union)
 
 def ner_sim(doc1, doc2):
@@ -174,37 +172,43 @@ def ner_sim(doc1, doc2):
 		return 1.0
 	return bow_sim(x1_ner, x2_ner)
 
+# we create training examples
 docs1, docs2 = [nlp(x) for x, _ in some_pairs], [nlp(y) for _, y in some_pairs]
 target = [[bow_sim(x1, x2), ner_sim(docs1[i], docs2[i])] for i, (x1, x2) in enumerate(some_pairs)]
 some_examples = [InputExample(texts=[x1, x2], label=target[i]) for (i, (x1, x2)) in enumerate(some_pairs)]
 
+# some development examples
 docs1_dev, docs2_dev = [nlp(x) for x, _ in some_pairs_dev], [nlp(y) for _, y in some_pairs_dev]
 target_dev = [[bow_sim(x1, x2), ner_sim(docs1_dev[i], docs2_dev[i])] for i, (x1, x2) in enumerate(some_pairs_dev)]
 some_examples_dev = [InputExample(texts=[x1, x2], label=target_dev[i]) for (i, (x1, x2)) in enumerate(some_pairs_dev)]
 
-# init model
+# initialize model
 pt = PartitionedSentenceTransformer(feature_names=["bow", "ner"], feature_dims=[32, 32])
 
 # explanation can be called before training, but it's meaningless, just to compare to later
-json = pt.explain_similarity([x for x, y in some_pairs_dev], [y for x, y in some_pairs_dev])
+decomposed_predictions = pt.explain_similarity([x for x, y in some_pairs_dev], [y for x, y in some_pairs_dev])
 
-# eval correlation to custom metric before training
-print(pearsonr([x.label[0] for x in some_examples_dev], [dic["bow"] for dic in json]))
-print(pearsonr([x.label[1] for x in some_examples_dev], [dic["ner"] for dic in json]))
+def feature_correlation(feature_name, preds):
+    return pearsonr([dic[feature_name] for dic in preds],
+                    [ex.label[pt.feature_names.index(feature_name)] for ex in some_examples_dev])[0]
+
+pearsonr_before_training = [feature_correlation(name, decomposed_predictions) for name in pt.feature_names]
 
 # print a toy example before training
-print(pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something"]))
+print("Text before training", pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something"]))
 
 # train
 pt.train_model(some_examples, some_examples_dev)
 
 # eval correlation to custom metric after train
-json = pt.explain_similarity([x for x, y in some_pairs_dev], [y for x, y in some_pairs_dev])
-print(pearsonr([x.label[0] for x in some_examples_dev], [dic["bow"] for dic in json]))
-print(pearsonr([x.label[1] for x in some_examples_dev], [dic["ner"] for dic in json]))
+decomposed_predictions = pt.explain_similarity([x for x, y in some_pairs_dev], [y for x, y in some_pairs_dev])
+pearsonr_after_training = [feature_correlation(name, decomposed_predictions) for name in pt.feature_names]
+
+for index, pr in enumerate(pearsonr_after_training):
+    print(f"Correlation for {pt.feature_names[index]} delta: {pr - pearsonr_before_training[index]}")
 
 # print a toy example after training
-print(pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something"]))
+print("Text after training:", pt.explain_similarity(["The kitten drinks milk"], ["A cat slurps something"]))
 ```
 
 ## Symbolic<a id="symbolic"></a>
