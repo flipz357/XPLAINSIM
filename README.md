@@ -1,12 +1,10 @@
 # *XPLAINSIM*: A Toolkit for Explaining Text Similarity
 
 A research toolkit for decomposing and **explaining text similarity**
-across neural, structured, and symbolic levels. 
-
-The toolkit is designed for interpretability research,
+across neural, structured, and symbolic levels. It's designed for interpretability research,
 controlled embedding and metric alignment, and hybrid neural-symbolic text analysis.
 
-The toolkit is also modular: each explanation paradigm can be used independently or combined in hybrid setups.
+The toolkit is modular: each explanation paradigm can be used independently or combined in hybrid setups.
 
 #### Conceptual Overview
 
