@@ -48,7 +48,7 @@ class PartitionedSentenceTransformer(SentenceTransformer):
         super().__init__(base_model_uri, device=device)
 
         assert len(feature_names) == len(feature_dims)
-        assert sum(feature_dims) <= self.get_sentence_embedding_dimension()
+        assert sum(feature_dims) < self.get_sentence_embedding_dimension()
         assert similarity in util.SIMILARITY_REGISTRY
         
         self.similarity_name = similarity
@@ -83,7 +83,6 @@ class PartitionedSentenceTransformer(SentenceTransformer):
         losses["partition"] = PartitionLoss(
             model=self,
             mode="metric",
-            feature_dims=self.feature_dims,
             similarity=self.similarity_name,
         )
 
@@ -107,7 +106,7 @@ class PartitionedSentenceTransformer(SentenceTransformer):
             train_examples: List[InputExample], 
             dev_examples: Optional[List[InputExample]] = None,
             batch_size: int = 32, lr: float = 1e-3, epochs: int = 1,
-            warmup_steps: int = 1000, eval_steps: int = 200,
+            warmup_steps: int = 100, eval_steps: int = 200,
             save_path: str = None, write_csv: bool = True,
             use_consistency: bool = True):
         

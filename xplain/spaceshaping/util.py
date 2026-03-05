@@ -2,12 +2,16 @@ from torch import Tensor
 import torch
 import torch.nn.functional as F
 
-from sentence_transformers import util
+from sentence_transformers import util as stutil
 
 SIMILARITY_REGISTRY = {
     "cosine": lambda a, b: torch.nn.functional.cosine_similarity(a, b, dim=1),
     "dot": lambda a, b: torch.sum(a * b, dim=1),
 }
+
+SIMILARITY_REGISTRY_ST = {
+    "cosine": stutil.cos_sim
+        }
 
 def freeze_all_layers(model):
     for name, param in model.named_parameters():

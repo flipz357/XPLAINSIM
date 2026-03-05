@@ -23,14 +23,12 @@ class PartitionLoss(nn.Module):
         - "metric": similarity between embedding partitions
         - "direct": direct regression on full embedding
     model: SentenceTransformer model
-    feature_dim: Optional Dimension of a feature, if None then 1
     loss_fct: Optional Custom pytorch loss function. If not set, uses nn.MSELoss()
     sim_fct: Optional: Custom similarity function. If not set, uses Cosine Sim
     """
     def __init__(self,
                  model: SentenceTransformer,
                  mode: str,
-                 feature_dims: Optional[List[int]] = None,
                  similarity: str = "cosine",
                  loss_fct: Callable = nn.MSELoss(),
                  use_bias: bool = False):
@@ -42,18 +40,15 @@ class PartitionLoss(nn.Module):
 
         self.model = model
         self.mode = mode
-        self.feature_dims = feature_dims
         self.similarity_name = similarity
         self.similarity_fct = util.SIMILARITY_REGISTRY[similarity]
         self.loss_fct = loss_fct
         self.use_bias = use_bias
 
         if self.mode == "metric":
-            assert feature_dims is not None
-            self.num_features = len(feature_dims)
 
             if use_bias:
-                self.score_bias = nn.Parameter(torch.ones(self.num_features))
+                self.score_bias = nn.Parameter(torch.ones(len(self.model.feature_names)))
             else:
                 self.register_parameter("score_bias", None)
     
@@ -70,11 +65,10 @@ class PartitionLoss(nn.Module):
             parts_b = self.model.split_embedding(emb_b, include_residual=False)
 
             sims = [self.similarity_fct(parts_a[name], parts_b[name]) for name in self.model.feature_names]
-
             outputs = torch.stack(sims, dim=1)
-
+            
             if self.use_bias:
-                outputs = outputs * self.score_bias
+                outputs = outputs + self.score_bias
 
             return self.loss_fct(outputs, labels)
 
@@ -86,7 +80,6 @@ class PartitionLoss(nn.Module):
     def get_config_dict(self):
         return {
             "mode": self.mode,
-            "feature_dims": self.feature_dims,
             "similarity": self.similarity_name,
             "loss_fct": self.loss_fct.__class__.__name__,
             "use_bias": self.use_bias,
@@ -107,18 +100,19 @@ class ConsistencyLoss(nn.Module):
                 mode: str = "paired",
                 similarity: str = "cosine",
                 loss_fct: Callable = nn.MSELoss(),
-                scale: float = 5.0):
+                scale: float = 2.5):
         
         super().__init__()
         
         assert mode in ["paired", "batch"]
-        assert similarity in util.SIMILARITY_REGISTRY
+        assert similarity in util.SIMILARITY_REGISTRY_ST
 
         self.model = model
         self.teacher = teacher
         self.mode = mode
         self.similarity_name = similarity
-        self.similarity_fct = util.SIMILARITY_REGISTRY[similarity]
+        self.similarity_fct = util.SIMILARITY_REGISTRY_ST[similarity]
+        self.similarity_fct_pair = util.SIMILARITY_REGISTRY[similarity]
         self.loss_fct = loss_fct
         self.scale = scale
 
@@ -140,13 +134,13 @@ class ConsistencyLoss(nn.Module):
             t_a = teacher_reps[0]
             t_b = torch.cat(teacher_reps[1:], dim=0)
 
-            score_s = self.similarity_fct(s_a, s_b) * self.scale
-            score_t = self.similarity_fct(t_a, t_b) * self.scale
+            score_s = self.similarity_fct_pair(s_a, s_b) * self.scale
+            score_t = self.similarity_fct_pair(t_a, t_b) * self.scale
 
             return self.loss_fct(score_s, score_t)
 
         # batch mode
-
+        
         s_all = torch.cat(student_reps, dim=0)
         t_all = torch.cat(teacher_reps, dim=0)
 
@@ -154,6 +148,9 @@ class ConsistencyLoss(nn.Module):
         sim_t = self.similarity_fct(t_all, t_all) * self.scale
 
         return self.loss_fct(sim_s, sim_t)
+
+
+
 
     
     def get_config_dict(self):
@@ -177,7 +174,7 @@ class CombinedLoss(nn.Module):
         # Compute student embeddings ONCE
         reps = [self.model(sf)["sentence_embedding"] for sf in sentence_features]
 
-        total_loss = 0.0
+        total_loss = torch.tensor(0.0, device=reps[0].device)
 
         for loss in self.losses.values():
             total_loss += loss(reps, labels, sentence_features=sentence_features)
@@ -247,7 +244,7 @@ class MultiLossEvaluator(SentenceEvaluator):
             loss_sums[name] /= batches
 
         total_loss = sum(loss_sums.values())
-        score = 1 - total_loss
+        score = 0 - total_loss
 
         # CSV writing
         if output_path and self.write_csv:
@@ -255,7 +252,7 @@ class MultiLossEvaluator(SentenceEvaluator):
             write_header = not os.path.isfile(csv_path)
 
             with open(csv_path, "a", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f, delimiter=";")
+                writer = csv.writer(f, delimiter=",")
 
                 if write_header:
                     writer.writerow(self.csv_headers)

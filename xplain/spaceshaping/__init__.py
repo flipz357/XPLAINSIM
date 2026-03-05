@@ -1,1 +1,3 @@
-from xplain.spaceshaping.model import *
+from .model import PartitionedSentenceTransformer
+
+__all__ = ["PartitionedSentenceTransformer"]
