@@ -10,7 +10,6 @@ _AMRLIB_SMATCHPP_INSTALL_MESSAGE = (
 )
 
 def install_default_amr_model():
-    import os
     import subprocess
     import urllib.request
     import amrlib

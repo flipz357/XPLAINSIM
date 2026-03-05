@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 
 class AMRSimilarity:
 
-    def __init__(self, parser_engine=None, measure=None, subgraph_extractor=None, graph_scorer=None):
+    def __init__(self, parser_engine=None, measure=None, subgraph_extractor=None):
         
         if parser_engine is None:
             parser, reader, standardizer = self._build_parser_engine()
@@ -15,9 +15,6 @@ class AMRSimilarity:
         if measure is None:
             measure = self._build_measure()
         
-        #if graph_scorer is None:
-        #    measure = self._build_graph_scorer()
-        
         if subgraph_extractor is None:
             subgraph_extractor = self._build_subgraph_extractor()
 
@@ -26,7 +23,8 @@ class AMRSimilarity:
         self.standardizer = standardizer
         self.measure = measure
         self.subgraph_extractor = subgraph_extractor
-        self.graph_scorer = graph_scorer
+        from smatchpp.eval_statistics import get_fpr
+        self.get_fpr = get_fpr
 
     @staticmethod
     def _build_measure():
@@ -44,18 +42,7 @@ class AMRSimilarity:
 
         measure = Smatchpp(graph_reader=dummy_reader)
         return measure
-    
-    @staticmethod
-    def _build_graph_scorer():
-        try:
-            from smatchpp import score
-        except ModuleNotFoundError as e:
-            from xplain.symbolic.parser_install import _AMRLIB_SMATCHPP_INSTALL_MESSAGE
-            raise ModuleNotFoundError(_AMRLIB_SMATCHPP_INSTALL_MESSAGE) from e
-        
-        scorer = score.TripleScorer()
-        return scorer
-    
+     
     @staticmethod
     def _build_subgraph_extractor():
         try:
@@ -103,6 +90,40 @@ class AMRSimilarity:
         name_subgraph_dict["global"] = self.standardizer.standardize(self.reader.string2graph(string_graph))
         return name_subgraph_dict
 
+
+    def _align_and_score(self, sa: str, sb: str, string_graph1_raw: str, string_graph2_raw: str, return_graphs: bool = False):
+        result = {"sent_a": sa, "sent_b": sb}
+        name_subgraph_dict1 = self._raw_string_graph_to_subgraph_dict(string_graph1_raw)
+        name_subgraph_dict2 = self._raw_string_graph_to_subgraph_dict(string_graph2_raw)
+        for graph_type in name_subgraph_dict1:
+            g1s = name_subgraph_dict1[graph_type]
+            g2s = name_subgraph_dict2[graph_type]
+            
+            g1 = self.measure.graph_reader.string2graph(g1s)
+            g1 = self.measure.graph_standardizer.standardize(g1)
+            g2 = self.measure.graph_reader.string2graph(g2s)
+            g2 = self.measure.graph_standardizer.standardize(g2)
+            g1, g2, v1, v2 = self.measure.graph_pair_preparer.prepare_get_vars(g1, g2)
+            alignment, var_index, _ = self.measure.graph_aligner.align(g1, g2, v1, v2)
+            var_map = self.measure.graph_aligner._get_var_map(alignment, var_index)
+            interpretable_mapping = self.measure.graph_aligner._interpretable_mapping(var_map, g1, g2)
+            
+            # array with 4 values: match count from left to right, from right to left, size of left, size of right 
+            # first two values typically the same
+            score_stats = self.measure.graph_scorer.score(g1, g2, alignment, var_index)
+            
+            # precision/recall/f1
+            fpr = self.get_fpr(score_stats)
+            result[graph_type] = {"f1": fpr[0], "precision": fpr[1], "recall": fpr[2]}
+            
+            if return_graphs:
+                result[graph_type]["subgraph1"] = g1s
+                result[graph_type]["subgraph2"] = g2s
+                result[graph_type]["alignment"] = interpretable_mapping
+        return result
+
+
+
     def explain_similarity(self, 
                            sent_a: Union[str, List[str]], sent_b: Union[str, List[str]], 
                            return_graphs: bool = False
@@ -123,37 +144,9 @@ class AMRSimilarity:
         graphs1 = self.parser.parse_sents(sent_a)
         graphs2 = self.parser.parse_sents(sent_b)
         explanations = []
-        i = 0
+        
         for sa, sb, string_graph1_raw, string_graph2_raw in zip(sent_a, sent_b, graphs1, graphs2):
-            name_subgraph_dict1 = self._raw_string_graph_to_subgraph_dict(string_graph1_raw)
-            name_subgraph_dict2 = self._raw_string_graph_to_subgraph_dict(string_graph2_raw)
-            result = {"sent_a": sa, "sent_b": sb}
-            for graph_type in name_subgraph_dict1:
-                g1s = name_subgraph_dict1[graph_type]
-                g2s = name_subgraph_dict2[graph_type]
-                
-                g1 = self.measure.graph_reader.string2graph(g1s)
-                g1 = self.measure.graph_standardizer.standardize(g1)
-                g2 = self.measure.graph_reader.string2graph(g2s)
-                g2 = self.measure.graph_standardizer.standardize(g2)
-                g1, g2, v1, v2 = self.measure.graph_pair_preparer.prepare_get_vars(g1, g2)
-                alignment, var_index, _ = self.measure.graph_aligner.align(g1, g2, v1, v2)
-                var_map = self.measure.graph_aligner._get_var_map(alignment, var_index)
-                interpretable_mapping = self.measure.graph_aligner._interpretable_mapping(var_map, g1, g2)
-                # array with 4 values: match count from left to right, from right to left, size of left, size of right 
-                # first two values typically the same
-                score_stats = self.measure.graph_scorer.score(g1, g2, alignment, var_index)
-                # a bit ad hoc but perhaps less confusing than recall, precision and F1
-                similarity = (score_stats[0] + score_stats[1]) / max(score_stats[2] + score_stats[3], 1)
-                match = {"similarity": similarity}
-                result[graph_type] = match
-                """
-                result[graph_type] = self.measure.score_pair(g1s, g2s)
-                """
-                if return_graphs:
-                    result[graph_type]["subgraph1"] = g1s
-                    result[graph_type]["subgraph2"] = g2s
-                    result[graph_type]["alignment"] = interpretable_mapping
+            result = self._align_and_score(sa, sb, string_graph1_raw, string_graph2_raw, return_graphs)
             explanations.append(result)
-            i += 1
+
         return explanations[0] if single_input else explanations
