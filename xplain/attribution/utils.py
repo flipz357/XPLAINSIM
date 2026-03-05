@@ -76,26 +76,3 @@ def input_to_device(inpt: Dict[str, Any], device: torch.device) -> None:
             inpt[k] = v.to(device)
 
 
-def load_sts_data(path: PathLike) -> Tuple[list, list, list]:
-    """Loads STS data from a gzipped TSV file.
-
-    Args:
-        path (PathLike): Path to the dataset file.
-
-    Returns:
-        Tuple[list, list, list]: Train, dev, and test samples.
-    """
-    train_samples, dev_samples, test_samples = [], [], []
-    with gzip.open(path, "rt", encoding="utf8") as fIn:
-        reader = csv.DictReader(fIn, delimiter="\t", quoting=csv.QUOTE_NONE)
-        for row in reader:
-            score = float(row["score"]) / 5.0
-            sample = InputExample(
-                texts=[row["sentence1"], row["sentence2"]], label=score
-            )
-            (
-                dev_samples
-                if row["split"] == "dev"
-                else test_samples if row["split"] == "test" else train_samples
-            ).append(sample)
-    return train_samples, dev_samples, test_samples

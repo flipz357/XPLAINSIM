@@ -137,7 +137,7 @@ class XSTransformer(SentenceTransformer):
         tokens = [t[1:] if t[0] in ["Ġ", "Â"] else t for t in tokens]
         tokens = ["CLS"] + tokens + ["EOS"]
         return tokens
-
+    
     def _compute_integrated_jacobian(
         self,
         embedding: torch.Tensor,
@@ -176,11 +176,12 @@ class XSTransformer(SentenceTransformer):
             emb, interm, move_to_cpu=move_to_cpu, verbose=verbose
         )
         D, S, D = J.shape
+
         J = J.reshape((D, S * D))
 
         d = interm[0] - interm[-1]
         d = d.reshape(S * D, 1).detach()
-        return emb, d, J, S, D
+        return emb, d, J, S, D, features
      
     def explain_similarity(
         self,
@@ -232,8 +233,8 @@ class XSTransformer(SentenceTransformer):
         self.intermediates.clear()
         # device = self[0].auto_model.embeddings.word_embeddings.weight.device
 
-        emb_a, da, J_a, Sa, Da = self._process(sent_a, 0)
-        emb_b, db, J_b, Sb, Db = self._process(sent_b, 1)
+        emb_a, da, J_a, Sa, Da, features_a = self._process(sent_a, 0)
+        emb_b, db, J_b, Sb, Db, features_b = self._process(sent_b, 1)
         
         J = torch.mm(J_a.T, J_b)
         da = da.repeat(1, Sb * Db)

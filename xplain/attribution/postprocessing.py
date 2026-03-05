@@ -93,37 +93,102 @@ def mpnet_tokenizer_merge_subtokens(tokens):
 
     return merged_tokens, index_map
 
+"""
 def adjust_matrix_to_full_tokens(A_align, index_map_a, index_map_b, aggregation):
-            """
-            Adjusts the alignment matrix based on the merged token indices.
-            
-            Args:
-                A_align (torch.Tensor): The original alignment matrix between TOKENS sub-tokens.
-                index_map_a (list of list of int): Mapping from merged tokens to their original sub-token indices for the first sequence.
-                index_map_b (list of list of int): Mapping from merged tokens to their original sub-token indices for the second sequence.
-                aggregation (str): The method for aggregating alignment scores.
-            
-            Returns:
-                new_matrix (torch.Tensor): The adjusted alignment matrix between the original tokens.
-            """
-            new_matrix = torch.zeros((len(index_map_a), len(index_map_b)))
+    
+    Adjusts the alignment matrix based on the merged token indices.
+    
+    Args:
+        A_align (torch.Tensor): The original alignment matrix between TOKENS sub-tokens.
+        index_map_a (list of list of int): Mapping from merged tokens to their original sub-token indices for the first sequence.
+        index_map_b (list of list of int): Mapping from merged tokens to their original sub-token indices for the second sequence.
+        aggregation (str): The method for aggregating alignment scores.
+    
+    Returns:
+        new_matrix (torch.Tensor): The adjusted alignment matrix between the original tokens.
+    
+    
+    new_matrix = torch.zeros((len(index_map_a), len(index_map_b)))
 
-            for i, indices_a in enumerate(index_map_a):
-                for j, indices_b in enumerate(index_map_b):
-                    values = A_align[torch.tensor(indices_a)[:, None], torch.tensor(indices_b)]
-                    
-                    if aggregation == 'mean':
-                        new_matrix[i, j] = values.mean()
-                    elif aggregation == 'min':
-                        new_matrix[i, j] = values.min()
-                    elif aggregation == 'max':
-                        new_matrix[i, j] = values.max()
-                    elif aggregation == 'sum':
-                        new_matrix[i, j] = values.sum()
-                    else:
-                        raise ValueError("Invalid aggregation method. Choose from 'mean', 'min', 'max', 'sum'.")
+    for i, indices_a in enumerate(index_map_a):
+        for j, indices_b in enumerate(index_map_b):
+            values = A_align[torch.tensor(indices_a)[:, None], torch.tensor(indices_b)]
+            
+            if aggregation == 'mean':
+                new_matrix[i, j] = values.mean()
+            elif aggregation == 'min':
+                new_matrix[i, j] = values.min()
+            elif aggregation == 'max':
+                new_matrix[i, j] = values.max()
+            elif aggregation == 'sum':
+                new_matrix[i, j] = values.sum()
+            else:
+                raise ValueError("Invalid aggregation method. Choose from 'mean', 'min', 'max', 'sum'.")
 
-            return new_matrix
+    return new_matrix
+"""
+
+def adjust_matrix_to_full_tokens(A, index_map_a, index_map_b, aggregation="sum"):
+    device = A.device
+
+    n_sub_a, n_sub_b = A.shape
+    n_words_a = len(index_map_a)
+    n_words_b = len(index_map_b)
+
+    # map subwords -> words
+    map_a = torch.empty(n_sub_a, dtype=torch.long, device=device)
+    map_b = torch.empty(n_sub_b, dtype=torch.long, device=device)
+
+    for i, idx in enumerate(index_map_a):
+        map_a[idx] = i
+
+    for j, idx in enumerate(index_map_b):
+        map_b[idx] = j
+
+    # expanded indices
+    row_idx = map_a[:, None].expand(n_sub_a, n_sub_b)
+    col_idx = map_b[None, :].expand(n_sub_a, n_sub_b)
+
+    out = torch.zeros(n_words_a, n_words_b, device=device)
+
+    if aggregation in ("sum", "mean"):
+
+        out.index_put_((row_idx, col_idx), A, accumulate=True)
+
+        if aggregation == "mean":
+            counts = torch.zeros_like(out)
+            counts.index_put_((row_idx, col_idx), torch.ones_like(A), accumulate=True)
+            out = out / counts.clamp(min=1)
+
+    elif aggregation in ("min", "max"):
+
+        fill = float("inf") if aggregation == "min" else float("-inf")
+        out.fill_(fill)
+
+        flat_idx = row_idx * n_words_b + col_idx
+
+        if aggregation == "min":
+            out.view(-1).scatter_reduce_(
+                0,
+                flat_idx.reshape(-1),
+                A.reshape(-1),
+                reduce="amin",
+                include_self=True,
+            )
+        else:
+            out.view(-1).scatter_reduce_(
+                0,
+                flat_idx.reshape(-1),
+                A.reshape(-1),
+                reduce="amax",
+                include_self=True,
+            )
+
+    else:
+        raise ValueError("aggregation must be one of: sum, mean, min, max")
+
+    return out
+
 
 def trim_attributions_and_tokens(
     matrix: torch.Tensor,
