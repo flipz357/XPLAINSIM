@@ -7,7 +7,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='xplainsim',
-    version='0.9',    
+    version='0.9.0',    
     description='A Python package for explaining text similarity',
     url='https://github.com/flipz357/XPLAINSIM',
     author='Juri Opitz, Andrianos Michail, Lucas Moeller',
