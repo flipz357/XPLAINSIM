@@ -8,7 +8,7 @@ from tqdm import tqdm
 from typing import Tuple, Optional, Union, List, Dict
 
 
-from xplain.attribution.utils import input_to_device
+from xplain.attribution.util import input_to_device
 from xplain.attribution.postprocessing import (
     trim_attributions_and_tokens,
     max_align,
