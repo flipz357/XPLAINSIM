@@ -32,19 +32,52 @@ def roberta_interpolation_hook(N: int, outputs: list):
  
 # mpnet
 
-def mpnet_interpolation_hook(N: int, outputs: list):
+def mpnet_reshaping_hook(N: int):
     def hook(model, inpt):
-        g = interpolate_reference_embedding(inpt[0], N=N)
-        outputs.append(g)
-        p = repeat_reference_input(inpt[3], N=N)
-        return (g, inpt[1], inpt[2], p)
+
+        if len(inpt) > 2 and inpt[2] is not None:
+            pos_bias = inpt[2]
+            pos_bias = torch.cat(
+                [pos_bias[0:1].repeat(N, 1, 1, 1), pos_bias[1:2]],
+                dim=0
+            )
+        else:
+            pos_bias = None
+
+        if len(inpt) > 3:
+            p = repeat_reference_input(inpt[3], N=N)
+            return (inpt[0], inpt[1], pos_bias, p)
+
+        return (inpt[0], inpt[1], pos_bias)
+
     return hook
 
-def mpnet_reshaping_hook(N: int):
-     def hook(model, inpt):
-          p = repeat_reference_input(inpt[3], N=N)
-          return inpt[:3] + (p,)
-     return hook
+def mpnet_interpolation_hook(N: int, outputs: list):
+    def hook(model, inpt):
+
+        g = interpolate_reference_embedding(inpt[0], N=N)
+        outputs.append(g)
+
+        hidden_states = g
+        attention_mask = inpt[1]
+
+        # expand position bias if present
+        if len(inpt) > 2 and inpt[2] is not None:
+            pos_bias = inpt[2]
+            pos_bias = torch.cat(
+                [pos_bias[0:1].repeat(N, 1, 1, 1), pos_bias[1:2]],
+                dim=0
+            )
+        else:
+            pos_bias = None
+
+        if len(inpt) > 3:
+            p = repeat_reference_input(inpt[3], N=N)
+            return (hidden_states, attention_mask, pos_bias, p)
+
+        return (hidden_states, attention_mask, pos_bias)
+
+    return hook
 
 
 # gte
