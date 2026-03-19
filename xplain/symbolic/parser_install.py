@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 _AMRLIB_SMATCHPP_INSTALL_MESSAGE = (
     "AMR functionality requires optional dependencies.\n"
     "Install via:\n\n"
-    "    pip install amrlib smatchpp\n"
+    "    pip install amrlib\n"
 )
 
 def install_default_amr_model():
@@ -24,9 +24,10 @@ def install_default_amr_model():
 
     urllib.request.urlretrieve(url, archive_path)
     subprocess.check_call(["tar", "-xvzf", archive_path, "-C", datapath])
-    subprocess.check_call(["mv",
-                           os.path.join(datapath, "model_parse_xfm_bart_base-v0_1_0"),
-                           os.path.join(datapath, "model_stog")])
+    src = os.path.join(datapath, "model_parse_xfm_bart_base-v0_1_0")
+    dst = os.path.join(datapath, "model_stog")
 
+    if not os.path.exists(dst):
+        subprocess.check_call(["mv", src, dst])
     logger.info("AMR parser model installed successfully.")
 
