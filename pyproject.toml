@@ -14,17 +14,20 @@ authors = [
 
 license = "GPL-3.0-only" 
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
 ]
 
 dependencies = [
     "torch",
-    "transformers[torch]",
-    "sentence-transformers",
+    "transformers[torch]==4.49.0",
+    "sentence-transformers==4.1.0",
     "datasets",
     "unidecode",
     "smatchpp"

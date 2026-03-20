@@ -1,3 +1,5 @@
+"""Loss functions and evaluators for partitioned embedding training."""
+
 import torch
 from torch import nn, Tensor
 from typing import Iterable, Dict, List, Callable, Optional
@@ -16,23 +18,32 @@ logger = logging.getLogger(__name__)
 
 
 class PartitionLoss(nn.Module):
-    """
-    Loss to decompose output space
+    """Loss for training feature-partitioned embedding spaces.
 
-    mode:
-        - "metric": similarity between embedding partitions
-        - "direct": direct regression on full embedding
-    model: SentenceTransformer model
-    loss_fct: Optional Custom pytorch loss function. If not set, uses nn.MSELoss()
-    sim_fct: Optional: Custom similarity function. If not set, uses Cosine Sim
+    In ``metric`` mode, computes similarity per partition and compares
+    against target labels. In ``direct`` mode, regresses the first *k*
+    embedding dimensions directly against labels.
+
+    Args:
+        model: Partitioned sentence transformer whose ``split_embedding``
+            method defines the subspaces.
+        mode: ``"metric"`` (partition-wise similarity) or ``"direct"``
+            (raw embedding regression).
+        similarity: Key into ``util.SIMILARITY_REGISTRY``.
+        loss_fct: PyTorch loss function applied to predictions vs labels.
+        use_bias: If True, adds a learnable bias to partition similarities
+            (only used in ``metric`` mode).
     """
-    def __init__(self,
-                 model: SentenceTransformer,
-                 mode: str,
-                 similarity: str = "cosine",
-                 loss_fct: Callable = nn.MSELoss(),
-                 use_bias: bool = False):
-        
+
+    def __init__(
+        self,
+        model: SentenceTransformer,
+        mode: str,
+        similarity: str = "cosine",
+        loss_fct: Callable = nn.MSELoss(),
+        use_bias: bool = False,
+    ):
+
         super().__init__()
 
         assert mode in ["metric", "direct"]
@@ -48,11 +59,25 @@ class PartitionLoss(nn.Module):
         if self.mode == "metric":
 
             if use_bias:
-                self.score_bias = nn.Parameter(torch.ones(len(self.model.feature_names)))
+                self.score_bias = nn.Parameter(
+                    torch.ones(len(self.model.feature_names))
+                )
             else:
                 self.register_parameter("score_bias", None)
-    
+
     def forward(self, reps, labels=None, sentence_features=None):
+        """Compute partition loss.
+
+        Args:
+            reps: List of embedding tensors ``[emb_a, emb_b]`` (metric mode)
+                or ``[emb]`` (direct mode).
+            labels: Target tensor. Shape ``(batch, n_features)`` for metric
+                mode, ``(batch, k)`` for direct mode.
+            sentence_features: Unused; kept for interface compatibility.
+
+        Returns:
+            Scalar loss tensor.
+        """
 
         if labels is None:
             raise ValueError("PartitionLoss requires labels.")
@@ -64,9 +89,12 @@ class PartitionLoss(nn.Module):
             parts_a = self.model.split_embedding(emb_a, include_residual=False)
             parts_b = self.model.split_embedding(emb_b, include_residual=False)
 
-            sims = [self.similarity_fct(parts_a[name], parts_b[name]) for name in self.model.feature_names]
+            sims = [
+                self.similarity_fct(parts_a[name], parts_b[name])
+                for name in self.model.feature_names
+            ]
             outputs = torch.stack(sims, dim=1)
-            
+
             if self.use_bias:
                 outputs = outputs + self.score_bias
 
@@ -78,6 +106,7 @@ class PartitionLoss(nn.Module):
         return self.loss_fct(emb[:, :k], labels)
 
     def get_config_dict(self):
+        """Return a serialisable dictionary of this loss's configuration."""
         return {
             "mode": self.mode,
             "similarity": self.similarity_name,
@@ -87,23 +116,33 @@ class PartitionLoss(nn.Module):
 
 
 class ConsistencyLoss(nn.Module):
-    """
-        This loss aligns the overall similarities of a learner with thouse of a teacher.
+    """Regularisation loss that aligns student similarities with a frozen teacher.
 
-        Modes: 
-            "paired" accepts two lists where texts are parallel (i.e., similar).
-            "batch" accepts one list with texts.
+    In ``paired`` mode, compares pairwise similarities of parallel sentence
+    pairs. In ``batch`` mode, compares full similarity matrices over all
+    sentences in the batch.
+
+    Args:
+        model: Student sentence transformer being trained.
+        teacher: Frozen teacher sentence transformer used as reference.
+        mode: ``"paired"`` or ``"batch"``.
+        similarity: Key into ``util.SIMILARITY_REGISTRY_ST``.
+        loss_fct: PyTorch loss function (default: MSELoss).
+        scale: Multiplicative scale applied to similarities before loss.
     """
-    def __init__(self, 
-                model: SentenceTransformer, 
-                teacher: SentenceTransformer,
-                mode: str = "paired",
-                similarity: str = "cosine",
-                loss_fct: Callable = nn.MSELoss(),
-                scale: float = 2.5):
-        
+
+    def __init__(
+        self,
+        model: SentenceTransformer,
+        teacher: SentenceTransformer,
+        mode: str = "paired",
+        similarity: str = "cosine",
+        loss_fct: Callable = nn.MSELoss(),
+        scale: float = 2.5,
+    ):
+
         super().__init__()
-        
+
         assert mode in ["paired", "batch"]
         assert similarity in util.SIMILARITY_REGISTRY_ST
 
@@ -120,11 +159,24 @@ class ConsistencyLoss(nn.Module):
         util.freeze_all_layers(self.teacher)
 
     def forward(self, reps, labels=None, sentence_features=None):
+        """Compute consistency loss between student and teacher.
 
-        student_reps = reps 
+        Args:
+            reps: Pre-computed student embeddings (list of tensors).
+            labels: Unused; kept for interface compatibility.
+            sentence_features: Raw sentence features, forwarded through the
+                frozen teacher to obtain reference embeddings.
+
+        Returns:
+            Scalar loss tensor.
+        """
+
+        student_reps = reps
 
         with torch.no_grad():
-            teacher_reps = [self.teacher(sf)["sentence_embedding"] for sf in sentence_features]
+            teacher_reps = [
+                self.teacher(sf)["sentence_embedding"] for sf in sentence_features
+            ]
 
         if self.mode == "paired":
 
@@ -140,7 +192,7 @@ class ConsistencyLoss(nn.Module):
             return self.loss_fct(score_s, score_t)
 
         # batch mode
-        
+
         s_all = torch.cat(student_reps, dim=0)
         t_all = torch.cat(teacher_reps, dim=0)
 
@@ -149,11 +201,8 @@ class ConsistencyLoss(nn.Module):
 
         return self.loss_fct(sim_s, sim_t)
 
-
-
-
-    
     def get_config_dict(self):
+        """Return a serialisable dictionary of this loss's configuration."""
         return {
             "mode": self.mode,
             "similarity": self.similarity_name,
@@ -163,13 +212,27 @@ class ConsistencyLoss(nn.Module):
 
 
 class CombinedLoss(nn.Module):
+    """Sums multiple loss components, computing embeddings only once.
+
+    Args:
+        model: Sentence transformer used to encode inputs.
+        losses: Mapping of loss names to loss modules. Each module's
+            ``forward`` receives pre-computed embeddings.
+    """
 
     def __init__(self, model: SentenceTransformer, losses: Dict[str, nn.Module]):
         super().__init__()
         self.model = model
         self.losses = losses
 
-    def forward(self, sentence_features: Iterable[Dict[str, Tensor]], labels: Tensor = None):
+    def forward(
+        self, sentence_features: Iterable[Dict[str, Tensor]], labels: Tensor = None
+    ):
+        """Encode inputs once and accumulate all sub-losses.
+
+        Returns:
+            Scalar total loss tensor.
+        """
 
         # Compute student embeddings ONCE
         reps = [self.model(sf)["sentence_embedding"] for sf in sentence_features]
@@ -183,6 +246,17 @@ class CombinedLoss(nn.Module):
 
 
 class MultiLossEvaluator(SentenceEvaluator):
+    """Evaluator that reports each sub-loss independently.
+
+    Computes embeddings once per batch and evaluates every loss component.
+    Returns the negated total loss as the score (higher is better).
+
+    Args:
+        dataloader: Evaluation data loader.
+        losses: Mapping of loss names to loss modules.
+        name: Optional suffix for the CSV log filename.
+        write_csv: Whether to append results to a CSV file.
+    """
 
     def __init__(
         self,
@@ -203,6 +277,7 @@ class MultiLossEvaluator(SentenceEvaluator):
         self.csv_headers = ["epoch", "steps", "score"] + list(losses.keys())
 
     def __call__(self, model, output_path=None, epoch=-1, steps=-1):
+        """Run evaluation and return negated total loss as score."""
 
         model.eval()
         self.dataloader.collate_fn = model.smart_batching_collate
@@ -221,18 +296,13 @@ class MultiLossEvaluator(SentenceEvaluator):
             with torch.no_grad():
 
                 # Compute embeddings once
-                reps = [
-                    model(sf)["sentence_embedding"]
-                    for sf in features
-                ]
+                reps = [model(sf)["sentence_embedding"] for sf in features]
 
                 # Evaluate each loss using shared embeddings
                 for name, loss_model in self.losses.items():
 
                     loss_val = loss_model(
-                        reps,
-                        labels=labels,
-                        sentence_features=features
+                        reps, labels=labels, sentence_features=features
                     )
 
                     loss_sums[name] += loss_val.item()
@@ -258,8 +328,7 @@ class MultiLossEvaluator(SentenceEvaluator):
                     writer.writerow(self.csv_headers)
 
                 writer.writerow(
-                    [epoch, steps, score] +
-                    [loss_sums[name] for name in self.losses]
+                    [epoch, steps, score] + [loss_sums[name] for name in self.losses]
                 )
 
         return score

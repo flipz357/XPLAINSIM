@@ -9,10 +9,12 @@ _AMRLIB_SMATCHPP_INSTALL_MESSAGE = (
     "    pip install amrlib\n"
 )
 
+
 def install_default_amr_model():
     import subprocess
     import urllib.request
     import amrlib
+
     url = "https://github.com/bjascob/amrlib-models/releases/download/parse_xfm_bart_base-v0_1_0/model_parse_xfm_bart_base-v0_1_0.tar.gz"
     logger.info("Downloading default AMR parser model...")
 
@@ -30,4 +32,3 @@ def install_default_amr_model():
     if not os.path.exists(dst):
         subprocess.check_call(["mv", src, dst])
     logger.info("AMR parser model installed successfully.")
-
