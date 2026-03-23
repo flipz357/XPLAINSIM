@@ -259,3 +259,24 @@ To also return the graphs and aspectual subgraphs (including node alignments), u
 ## FAQ<a id="faq"></a>
 
 ## Citation<a id="citation"></a>
+```bibtex
+@inproceedings{opitz-etal-2026-similar,
+    title = "Similar, but why? A Toolkit for Explaining Text Similarity",
+    author = "Opitz, Juri  and
+      Michail, Andrianos  and
+      Moeller, Lucas  and
+      Pad{\'o}, Sebastian  and
+      Clematide, Simon",
+    editor = "Croce, Danilo  and
+      Leidner, Jochen  and
+      Moosavi, Nafise Sadat",
+    booktitle = "Proceedings of the 19th Conference of the {E}uropean Chapter of the {A}ssociation for {C}omputational {L}inguistics (Volume 3: System Demonstrations)",
+    month = mar,
+    year = "2026",
+    address = "Rabat, Marocco",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.eacl-demo.16/",
+    pages = "203--214",
+    ISBN = "979-8-89176-382-1",
+}
+```
