@@ -233,8 +233,8 @@ class XSTransformer(SentenceTransformer):
         self.intermediates.clear()
         # device = self[0].auto_model.embeddings.word_embeddings.weight.device
 
-        emb_a, da, J_a, Sa, Da, features_a = self._process(sent_a, 0)
-        emb_b, db, J_b, Sb, Db, features_b = self._process(sent_b, 1)
+        emb_a, da, J_a, Sa, Da, features_a = self._process(sent_a, 0, device=device)
+        emb_b, db, J_b, Sb, Db, features_b = self._process(sent_b, 1, device=device)
         
         J = torch.mm(J_a.T, J_b)
         da = da.repeat(1, Sb * Db)
