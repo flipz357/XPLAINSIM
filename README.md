@@ -6,6 +6,10 @@ controlled embedding and metric alignment, and hybrid neural-symbolic text analy
 
 The toolkit is modular: each explanation paradigm can be used independently or combined in hybrid setups.
 
+
+[Colab Demo Notebook](https://colab.research.google.com/drive/1uu3q-KT28YWpO7FqrJlu6tmOn22HTZgO#scrollTo=AaxwFmWMy04m)
+
+
 #### Conceptual Overview
 
 XPLAINSIM currently provides three complementary explanation paradigms:
