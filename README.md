@@ -12,9 +12,9 @@ XPLAINSIM currently provides three complementary explanation paradigms:
 
 | Module        | Explanation Level  | What it Does     |
 |---------------|--------------------|------------------|
-| Attribution   | Token level        | Explain which tokens drive similarity |
-| SpaceShaping  | Embedding space    | Shape features to encode custom aspects |
-| Symbolic      | Graph level        | Explain which semantic roles/aspects align |
+| Attribution   | Token level        | Explain which tokens drive similarity in text embedding models |
+| SpaceShaping  | Embedding space    | Training interpretable text embedding models |
+| Symbolic      | Graph level        | Explain which semantic roles/aspects align through explicit meaning reprentation |
 
 #### Useful Links
 
