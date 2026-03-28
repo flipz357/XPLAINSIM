@@ -45,7 +45,7 @@ You can install via pip with:
 pip install xplainsim
 ```
 
-That's it. Only when using the Symbolic module with the default parser one [small extra installation](#symbolic-extra-install) is necessary.
+(When using the Symbolic module with the default parser a [small extra installation](#symbolic-extra-install) is necessary.)
 
 ## Attributions <a id="attribution"></a>
 
