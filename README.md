@@ -6,11 +6,6 @@ controlled embedding and metric alignment, and hybrid neural-symbolic text analy
 
 The toolkit is modular: each explanation paradigm can be used independently or combined in hybrid setups.
 
-[Paper](https://aclanthology.org/2026.eacl-demo.16)
-
-[Colab Demo Notebook](https://colab.research.google.com/drive/1uu3q-KT28YWpO7FqrJlu6tmOn22HTZgO#scrollTo=AaxwFmWMy04m)
-
-
 #### Conceptual Overview
 
 XPLAINSIM currently provides three complementary explanation paradigms:
@@ -20,6 +15,12 @@ XPLAINSIM currently provides three complementary explanation paradigms:
 | Attribution   | Token level        | Explain which tokens drive similarity |
 | SpaceShaping  | Embedding space    | Shape features to encode custom aspects |
 | Symbolic      | Graph level        | Explain which semantic roles/aspects align |
+
+#### Useful Links
+
+[Paper](https://aclanthology.org/2026.eacl-demo.16)
+
+[Colab Demo Notebook](https://colab.research.google.com/drive/1uu3q-KT28YWpO7FqrJlu6tmOn22HTZgO#scrollTo=AaxwFmWMy04m)
 
 #### Overview of Repository / Table of Contents
 
