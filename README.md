@@ -1,4 +1,4 @@
-# [*XPLAINSIM*: A Toolkit for Explaining Text Similarity](https://aclanthology.org/2026.eacl-demo.16)
+# *XPLAINSIM*: A Toolkit for Explaining Text Similarity
 
 A research toolkit for decomposing and **explaining text similarity**
 across neural, structured, and symbolic levels. It's designed for interpretability research,
@@ -6,7 +6,7 @@ controlled embedding and metric alignment, and hybrid neural-symbolic text analy
 
 The toolkit is modular: each explanation paradigm can be used independently or combined in hybrid setups.
 
-
+[Paper](https://aclanthology.org/2026.eacl-demo.16)
 [Colab Demo Notebook](https://colab.research.google.com/drive/1uu3q-KT28YWpO7FqrJlu6tmOn22HTZgO#scrollTo=AaxwFmWMy04m)
 
 
