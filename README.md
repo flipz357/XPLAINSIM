@@ -18,7 +18,7 @@ XPLAINSIM currently provides three complementary explanation paradigms:
 
 #### Useful Links
 
-[Paper](https://aclanthology.org/2026.eacl-demo.16)
+[Paper in ACL anthology](https://aclanthology.org/2026.eacl-demo.16)
 
 [Colab Demo Notebook](https://colab.research.google.com/drive/1uu3q-KT28YWpO7FqrJlu6tmOn22HTZgO#scrollTo=AaxwFmWMy04m)
 
