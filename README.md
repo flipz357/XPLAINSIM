@@ -233,10 +233,7 @@ For using the Symbolic module with the default parser small extra installations 
 ```
 !pip install amrlib
 !xplain-install-amr
-!pip install transformers[torch]==4.49.0
 ```
-
-The last line is to ensure that an older transformer version (`transformers<5`) is installed, as the default AMR parser is not yet compatible with version 5.
 
 ### Example<a id="amr"></a>
 
