@@ -136,7 +136,7 @@ pt.train_model(examples)
 
 ### Space Partitioning Example<a id="space-shaping-example"></a>
 
-Here's a very simple example for training and inferring with a custom model.
+We study a simplified example for training and inferring with a custom model.
 
 Concretely, we partition the embedding into three features/parts
 
