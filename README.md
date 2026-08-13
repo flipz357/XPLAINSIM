@@ -123,7 +123,7 @@ examples = []
 # compute the training/partitioning target
 for x, y in zip(list_with_strings, other_list_with_strings):
 	similarities = []
-        # Metrics/aspects that should be reflected in the embedding space
+	# Metrics/aspects that should be reflected in the embedding space
 	for metric in my_metrics:
 		similarities.append(metric.score(x, y))
 	examples.append(InputExample(texts=[x, y], label=similarities))
